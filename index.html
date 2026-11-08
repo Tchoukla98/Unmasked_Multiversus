@@ -27,30 +27,34 @@
     .page { display: none; max-width: 800px; margin: 0 auto; }
     .page.active { display: block; }
     
-    /* Config Page Styles */
     .actions-bar { background: var(--card-bg); padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
-    .btn { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    .btn { background: var(--primary); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; }
     .btn:hover { background: var(--primary-hover); }
     .btn-secondary { background: #475569; }
+    .btn-success { background: #22c55e; }
+    .btn-success:hover { background: #16a34a; }
+    
     .role-card-edit { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
     .role-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
     .role-number { font-size: 1.5rem; font-weight: bold; color: var(--accent); }
     .role-power { font-size: 0.9rem; background: #0f172a; padding: 10px; border-radius: 6px; color: #cbd5e1; border-left: 3px solid var(--primary); }
     .form-group { display: flex; flex-direction: column; gap: 4px; }
     label { font-size: 0.85rem; color: #94a3b8; }
-    input[type="text"], input[type="file"] { background: #0f172a; border: 1px solid var(--border); color: white; padding: 8px; border-radius: 6px; }
+    input[type="text"], input[type="file"] { background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; font-size: 1rem; }
     .preview-img { width: 60px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
-    .form-row { display: flex; gap: 10px; align-items: center; }
+    .form-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
-    /* Firebase Config Panel */
     .firebase-panel { background: var(--card-bg); padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid var(--primary); }
     .firebase-panel input { width: 100%; margin-top: 5px; margin-bottom: 10px; }
     
-    /* Game Page Styles */
-    .game-lobby { text-align: center; background: var(--card-bg); padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-    .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 20px; }
-    .card-item { background: #0f172a; border: 2px solid var(--primary); border-radius: 8px; padding: 10px; text-align: center; }
-    .card-item img { width: 100%; height: 120px; object-fit: cover; border-radius: 4px; margin-top: 5px; }
+    .game-lobby { text-align: center; background: var(--card-bg); padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid var(--border); }
+    .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 20px; }
+    .card-item { background: #0f172a; border: 2px solid var(--primary); border-radius: 10px; padding: 10px; text-align: center; }
+    .card-item img { width: 100%; height: 140px; object-fit: cover; border-radius: 6px; margin-top: 5px; }
+
+    .room-status { background: #1e293b; border: 2px dashed var(--accent); padding: 15px; border-radius: 10px; margin-top: 15px; text-align: center; }
+    .players-list { display: flex; justify-content: center; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
+    .player-badge { background: var(--primary); padding: 6px 12px; border-radius: 20px; font-size: 0.9rem; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -66,16 +70,14 @@
   <!-- PAGE DE CONFIGURATION DES RÔLES -->
   <main id="config-page" class="page active">
     
-    <!-- PANNEAU CONFIGURATION FIREBASE -->
     <div class="firebase-panel">
       <h3>🔥 Connexion Firebase Realtime Database</h3>
-      <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">Entrez l'URL de votre base pour synchroniser avec les autres joueurs.</p>
       <div class="form-group">
         <label>Database URL Firebase :</label>
-        <input type="text" id="fb-db-url" placeholder="https://unmasked-multiversus-default-rtdb.firebaseio.com/">
+        <input type="text" id="fb-db-url" value="https://unmasked-multiversus-default-rtdb.europe-west1.firebasedatabase.app">
       </div>
       <button class="btn" onclick="initFirebase()">Connecter Firebase</button>
-      <span id="fb-status" style="margin-left: 10px; font-size: 0.85rem; color: #e2e8f0;">Statut : Non connecté</span>
+      <span id="fb-status" style="margin-left: 10px; font-size: 0.85rem; color: #4ade80; display: block; margin-top: 5px;">Statut : Connecté par défaut</span>
     </div>
 
     <div class="actions-bar">
@@ -89,47 +91,74 @@
       </div>
     </div>
 
-    <div id="roles-container">
-      <!-- Les cartes de rang 9 à 0 seront générées dynamiquement en JS -->
-    </div>
+    <div id="roles-container"></div>
   </main>
 
   <!-- PAGE ESPACE DE JEU -->
   <main id="game-page" class="page">
     <div class="game-lobby">
-      <h2>Salon de Jeu</h2>
-      <p style="margin: 10px 0; color: #94a3b8;">Rejoignez ou créez une partie multijoueur</p>
-      <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
-        <input type="text" id="room-code" placeholder="Code de partie (ex: ABCD)" style="width: 200px;">
-        <button class="btn">Créer / Rejoindre</button>
+      <h2>Salon de Jeu Multijoueur</h2>
+      <p style="margin: 10px 0; color: #94a3b8;">Saisissez un code de salon pour créer ou rejoindre</p>
+      <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
+        <input type="text" id="player-name" placeholder="Votre Pseudo" style="width: 150px;" value="Joueur 1">
+        <input type="text" id="room-code" placeholder="Code (ex: ABCD)" style="width: 150px;">
+        <button class="btn btn-success" onclick="joinOrCreateRoom()">Créer / Rejoindre</button>
+      </div>
+
+      <div id="active-room" class="room-status" style="display: none;">
+        <h3>Salon : <span id="current-room-id" style="color: var(--accent);"></span></h3>
+        <p style="margin-top: 5px;">Joueurs connectés :</p>
+        <div id="players-container" class="players-list"></div>
+        <button class="btn btn-primary" style="margin-top: 10px;" onclick="startGame()">Lancer la Partie 🚀</button>
       </div>
     </div>
 
     <h3>Aperçu des cartes du jeu (Synchronisées)</h3>
-    <div id="cards-preview" class="board">
-      <!-- Aperçu dynamique -->
-    </div>
+    <div id="cards-preview" class="board"></div>
   </main>
 
   <script>
-    // Structure par défaut des rôles originaux (De 9 à 0)
     const defaultRoles = [
-      { rank: 9, official: "Princesse", name: "Princesse Céleste", power: "Si vous défaussez cette carte (pour n'importe quelle raison), vous êtes immédiatement éliminé de la manche.", image: "" },
-      { rank: 8, official: "Comtesse", name: "Comtesse de l'Ombre", power: "Si vous avez cette carte ET le Roi (7) ou le Prince (5) en main, vous devez obligatoirement défausser la Comtesse.", image: "" },
-      { rank: 7, official: "Roi", name: "Souverain Multivers", power: "Choisissez un autre joueur et échangez votre main avec la sienne.", image: "" },
-      { rank: 6, official: "Chancelier", name: "Archiviste du Temps", power: "Piochez 2 cartes du paquet, conservez-en 1 et remettez les 2 autres cartes sous le paquet principal.", image: "" },
-      { rank: 5, official: "Prince", name: "Prince Héritier", power: "Choisissez n'importe quel joueur (y compris vous-même). Il défausse sa main et en poche une nouvelle.", image: "" },
-      { rank: 4, official: "Servante", name: "Gardienne du Bouclier", power: "Jusqu'à votre prochain tour, vous êtes totalement protégé(e) contre les effets des cartes des autres joueurs.", image: "" },
-      { rank: 3, official: "Baron", name: "Baron Dueliste", power: "Comparez votre main avec celle d'un autre joueur en secret. Celui qui a le rang le plus bas est éliminé.", image: "" },
+      { rank: 9, official: "Princesse", name: "Princesse Céleste", power: "Si vous défaussez cette carte, vous êtes immédiatement éliminé.", image: "" },
+      { rank: 8, official: "Comtesse", name: "Comtesse de l'Ombre", power: "Si vous avez cette carte ET le Roi (7) ou le Prince (5), défaussez la Comtesse.", image: "" },
+      { rank: 7, official: "Roi", name: "Souverain Multivers", power: "Échangez votre main avec un autre joueur.", image: "" },
+      { rank: 6, official: "Chancelier", name: "Archiviste du Temps", power: "Piochez 2 cartes, gardez-en 1 et remettez les 2 autres sous le paquet.", image: "" },
+      { rank: 5, official: "Prince", name: "Prince Héritier", power: "Un joueur défausse sa main et en pioche une nouvelle.", image: "" },
+      { rank: 4, official: "Servante", name: "Gardienne du Bouclier", power: "Protection totale contre les cartes jusqu'à votre prochain tour.", image: "" },
+      { rank: 3, official: "Baron", name: "Baron Dueliste", power: "Comparez votre main avec un autre joueur. La carte la plus basse est éliminée.", image: "" },
       { rank: 2, official: "Prêtre", name: "Voyant Oracle", power: "Regardez secrètement la main d'un autre joueur.", image: "" },
-      { rank: 1, official: "Garde", name: "Chasseur de Rôles", power: "Désignez un joueur et nommez un rôle (autre que Garde). S'il a ce rôle en main, il est éliminé.", image: "" },
-      { rank: 0, official: "Espionne", name: "Agent Infiltré", power: "Si vous êtes le seul joueur en vie à avoir joué/défaussé une Espionne cette manche, vous gagnez 1 point bonus.", image: "" }
+      { rank: 1, official: "Garde", name: "Chasseur de Rôles", power: "Devinez la carte d'un joueur. S'il l'a en main, il est éliminé.", image: "" },
+      { rank: 0, official: "Espionne", name: "Agent Infiltré", power: "Gagnez 1 point bonus si vous êtes le seul à avoir joué l'Espionne.", image: "" }
     ];
 
     let currentRoles = JSON.parse(localStorage.getItem('unmasked_roles')) || defaultRoles;
     let db = null;
+    let currentRoom = null;
+    let myPlayerId = "p_" + Math.random().toString(36).substr(2, 5);
 
-    // Navigation entre onglets
+    // Initialisation Firebase automatique avec votre URL
+    window.onload = function() {
+      initFirebase();
+      renderConfig();
+    };
+
+    function initFirebase() {
+      const dbUrl = document.getElementById('fb-db-url').value.trim();
+      if(!dbUrl) return;
+
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp({ databaseURL: dbUrl });
+        }
+        db = firebase.database();
+        document.getElementById('fb-status').innerText = "Statut : Connecté à Firebase ✅";
+        document.getElementById('fb-status').style.color = "#4ade80";
+      } catch(e) {
+        document.getElementById('fb-status').innerText = "Erreur connexion : " + e.message;
+        document.getElementById('fb-status').style.color = "#ef4444";
+      }
+    }
+
     function switchPage(page) {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -143,7 +172,6 @@
       }
     }
 
-    // Afficher la liste des rôles dans la page de configuration
     function renderConfig() {
       const container = document.getElementById('roles-container');
       container.innerHTML = '';
@@ -205,62 +233,13 @@
       }
     }
 
-    // Connexion Firebase Realtime Database
-    function initFirebase() {
-      const dbUrl = document.getElementById('fb-db-url').value.trim();
-      if(!dbUrl) return alert("Veuillez entrer une URL de base Firebase valide.");
-
-      try {
-        if (!firebase.apps.length) {
-          firebase.initializeApp({ databaseURL: dbUrl });
-        }
-        db = firebase.database();
-        document.getElementById('fb-status').innerText = "Statut : Connecté à Firebase ✅";
-        document.getElementById('fb-status').style.color = "#4ade80";
-      } catch(e) {
-        alert("Erreur de connexion Firebase : " + e.message);
-      }
-    }
-
     function saveToFirebase() {
-      if(!db) return alert("Veuillez d'abord connecter Firebase en haut de la page.");
+      if(!db) return alert("Firebase n'est pas connecté.");
       db.ref('roles_config').set(currentRoles)
         .then(() => alert("Configuration synchronisée sur Firebase !"))
-        .catch(err => alert("Erreur de sauvegarde Firebase : " + err.message));
+        .catch(err => alert("Erreur : " + err.message));
     }
 
     function loadFromFirebase() {
-      if(!db) return alert("Veuillez d'abord connecter Firebase en haut de la page.");
-      db.ref('roles_config').once('value').then(snapshot => {
-        if(snapshot.exists()) {
-          currentRoles = snapshot.val();
-          saveToLocal();
-          renderConfig();
-          alert("Configuration chargée depuis Firebase !");
-        } else {
-          alert("Aucune configuration trouvée sur Firebase.");
-        }
-      });
-    }
-
-    // Affichage dans l'espace de jeu
-    function renderPreview() {
-      const container = document.getElementById('cards-preview');
-      container.innerHTML = '';
-      currentRoles.forEach(role => {
-        const div = document.createElement('div');
-        div.className = 'card-item';
-        div.innerHTML = `
-          <div style="font-weight:bold; color:var(--accent);">${role.rank} - ${role.name}</div>
-          <div style="font-size:0.75rem; color:#94a3b8;">(${role.official})</div>
-          ${role.image ? `<img src="${role.image}">` : '<div style="height:120px; background:#1e293b; margin-top:5px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.8rem; color:#64748b;">Pas d\'image</div>'}
-        `;
-        container.appendChild(div);
-      });
-    }
-
-    // Initialisation au chargement de la page
-    renderConfig();
-  </script>
-</body>
-</html>
+      if(!db) return alert("Firebase n'est pas connecté.");
+      db.ref('roles_config').once('value').then(
