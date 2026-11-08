@@ -22,6 +22,7 @@ let currentBaronDuelData = null;
 let currentPrinceData = null;
 let currentChancellorData = null;
 let currentKingData = null;
+let currentEndRoundData = null;
 let selectedChancellorIndices = [];
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -207,7 +208,8 @@ function startGameLogic() {
       baronEvent: null,
       princeEvent: null,
       chancellorEvent: null,
-      kingEvent: null
+      kingEvent: null,
+      endRoundEvent: null
     };
 
     db.ref(`rooms/${currentRoom}/gameState`).set(gameState);
@@ -235,7 +237,8 @@ function startBotGame() {
     baronEvent: null,
     princeEvent: null,
     chancellorEvent: null,
-    kingEvent: null
+    kingEvent: null,
+    endRoundEvent: null
   };
 
   localState.hands[playerId].push(localState.deck.pop());
@@ -300,8 +303,6 @@ function updateGameBoard(state) {
   const handContainer = document.getElementById('my-hand');
   handContainer.innerHTML = '';
   const myCards = state.hands[playerId] || [];
-
-  // RÈGLE COMTESSE (RANG 8) : Si Rang 8 est présent avec 5 ou 7, désactiver 5 et 7
   const hasCountess = myCards.includes(8);
 
   myCards.forEach((cardRank) => {
@@ -338,6 +339,7 @@ function updateGameBoard(state) {
   if(state.princeEvent && !currentPrinceData) checkAndDisplayPrinceModal(state.princeEvent);
   if(state.chancellorEvent && !currentChancellorData) checkAndDisplayChancellorModal(state.chancellorEvent);
   if(state.kingEvent && !currentKingData) checkAndDisplayKingModal(state.kingEvent);
+  if(state.endRoundEvent && !currentEndRoundData) triggerEndRoundModal(state.endRoundEvent);
 }
 
 // CLIC SUR LES CARTES
@@ -361,7 +363,7 @@ function onCardClicked(cardRank, state) {
   }
 }
 
-// --- RANG 3 : BARON (CORRIGÉ : DEVOILEMENT AUTOMATIQUE APRÈS 3 SECONDES) ---
+// --- RANG 3 : BARON ---
 function openBaronModal(state) {
   const targetSelect = document.getElementById('baron-target-player');
   targetSelect.innerHTML = '';
@@ -449,7 +451,6 @@ function checkAndDisplayBaronModal(baronData) {
 
   document.getElementById('modal-baron-duel').style.display = 'flex';
 
-  // RÉVÉLATION AUTOMATIQUE APRÈS 3 SECONDES
   setTimeout(() => {
     revealBaronCards();
   }, 3000);
@@ -505,7 +506,6 @@ function revealBaronCards() {
     outcome.innerHTML = `<span style="color:var(--accent);">🤝 ÉGALITÉ !</span>`;
   }
 
-  // FERMETURE AUTOMATIQUE 3 SECONDES APRÈS DÉVOILEMENT
   setTimeout(() => {
     finishBaronTurn(loserId, logText);
   }, 3000);
@@ -1202,6 +1202,159 @@ function closePriestResultModal() {
   document.getElementById('modal-priest-result').style.display = 'none';
 }
 
+// --- GESTION DE FIN DE MANCHE (PIOSCHE ÉPUISÉE OU 1 SEUL JOUEUR EN VIE) ---
+function checkEndRoundCondition(state) {
+  if(!state) return false;
+
+  const alivePlayers = state.playerOrder.filter(id => !state.eliminated || !state.eliminated[id]);
+
+  // Cas 1 : Un seul survivant
+  if(alivePlayers.length === 1) {
+    const winnerId = alivePlayers[0];
+    const winnerName = state.playerNames[winnerId] || "Joueur";
+    
+    const endRoundData = {
+      reason: 'elimination',
+      winnerId: winnerId,
+      winnerName: winnerName,
+      handsToReveal: state.hands
+    };
+    
+    state.endRoundEvent = endRoundData;
+    triggerEndRoundModal(endRoundData);
+    return true;
+  }
+
+  // Cas 2 : Pioche vide
+  if(!state.deck || state.deck.length === 0) {
+    let highestRank = -1;
+    alivePlayers.forEach(id => {
+      const cardVal = state.hands[id] ? state.hands[id][0] : -1;
+      if(cardVal > highestRank) highestRank = cardVal;
+    });
+
+    const endRoundData = {
+      reason: 'deck_empty',
+      highestRank: highestRank,
+      alivePlayers: alivePlayers,
+      handsToReveal: state.hands
+    };
+
+    state.endRoundEvent = endRoundData;
+    triggerEndRoundModal(endRoundData);
+    return true;
+  }
+
+  return false;
+}
+
+function triggerEndRoundModal(endData) {
+  currentEndRoundData = endData;
+
+  const container = document.getElementById('end-round-cards-container');
+  const statusMsg = document.getElementById('end-round-status-msg');
+  const subtitle = document.getElementById('end-round-subtitle');
+
+  container.innerHTML = '';
+  
+  if(endData.reason === 'elimination') {
+    subtitle.innerText = `🏆 Victoire de ${endData.winnerName} ! Tous les autres joueurs ont été éliminés.`;
+  } else {
+    subtitle.innerText = "📜 Fin de la manche : La pioche est épuisée ! La carte la plus forte gagne cette manche.";
+  }
+
+  const aliveList = endData.alivePlayers || Object.keys(endData.handsToReveal);
+
+  // Étape 1 : Cartes face cachée pour tous les joueurs
+  aliveList.forEach(pId => {
+    const pName = (localState && localState.playerNames) ? localState.playerNames[pId] : pId;
+    const cardSlot = document.createElement('div');
+    cardSlot.id = `end-card-slot-${pId}`;
+    cardSlot.style.textAlign = 'center';
+    cardSlot.innerHTML = `
+      <div style="font-size:0.75rem; color:var(--accent); font-weight:bold; margin-bottom:4px;">${pName}</div>
+      <div class="card-back-style">❓</div>
+    `;
+    container.appendChild(cardSlot);
+  });
+
+  document.getElementById('modal-end-round').style.display = 'flex';
+
+  let countdownReveal = 3;
+  statusMsg.innerText = `Révélation des cartes dans ${countdownReveal}s...`;
+
+  const revealTimer = setInterval(() => {
+    countdownReveal--;
+    if(countdownReveal > 0) {
+      statusMsg.innerText = `Révélation des cartes dans ${countdownReveal}s...`;
+    } else {
+      clearInterval(revealTimer);
+      revealEndRoundCards(endData);
+    }
+  }, 1000);
+}
+
+function revealEndRoundCards(endData) {
+  const container = document.getElementById('end-round-cards-container');
+  const statusMsg = document.getElementById('end-round-status-msg');
+
+  container.innerHTML = '';
+
+  const aliveList = endData.alivePlayers || Object.keys(endData.handsToReveal);
+  let highestValue = endData.highestRank;
+
+  if(endData.reason === 'elimination') {
+    highestValue = endData.handsToReveal[endData.winnerId] ? endData.handsToReveal[endData.winnerId][0] : 0;
+  }
+
+  aliveList.forEach(pId => {
+    const pName = (localState && localState.playerNames) ? localState.playerNames[pId] : pId;
+    const pCardVal = endData.handsToReveal[pId] ? endData.handsToReveal[pId][0] : 0;
+    const roleObj = rolesData.find(r => r.rank === pCardVal) || { rank: pCardVal, name: "Rang " + pCardVal };
+
+    const isWinner = (pCardVal === highestValue);
+
+    const wrapper = document.createElement('div');
+    wrapper.style.textAlign = 'center';
+
+    wrapper.innerHTML = `
+      <div style="font-size:0.75rem; color:${isWinner ? '#4ade80' : '#ef4444'}; font-weight:bold; margin-bottom:4px;">${pName}</div>
+      <div class="card-playable ${isWinner ? 'winner-highlight' : 'loser-highlight'}" style="cursor:default; width:115px; height:160px;">
+        <div class="card-badge-num">${roleObj.rank}</div>
+        <div class="card-title">${roleObj.name || roleObj.official}</div>
+        <div class="card-img-holder" style="height:65px;">
+          ${roleObj.image ? `<img src="${roleObj.image}">` : '<div style="height:100%; background:#15803d; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.6rem;">Sans Image</div>'}
+        </div>
+        <div class="card-desc-box" style="font-size:0.55rem; max-height:45px;">
+          <strong>${roleObj.name || roleObj.official}</strong>
+        </div>
+      </div>
+    `;
+    container.appendChild(wrapper);
+  });
+
+  let countdownReset = 4;
+  statusMsg.innerText = `Nouvelle manche dans ${countdownReset}s...`;
+
+  const resetTimer = setInterval(() => {
+    countdownReset--;
+    if(countdownReset > 0) {
+      statusMsg.innerText = `Nouvelle manche dans ${countdownReset}s...`;
+    } else {
+      clearInterval(resetTimer);
+      document.getElementById('modal-end-round').style.display = 'none';
+      currentEndRoundData = null;
+
+      // Réinitialisation de la manche
+      if(currentGameMode === 'bot') {
+        startBotGame();
+      } else {
+        startGameLogic();
+      }
+    }
+  }, 1000);
+}
+
 // EXECUTION GENERALE DES TOURS
 function executePlayCard(cardRank, state, customLog) {
   const idx = state.hands[playerId].indexOf(cardRank);
@@ -1212,6 +1365,12 @@ function executePlayCard(cardRank, state, customLog) {
 
   state.lastPlayed = { player: myPlayerName, card: cardRank };
   state.lastLog = customLog || `${myPlayerName} a joué ${cardName} (Rang ${cardRank})`;
+
+  // Vérifier d'abord la condition de fin de manche
+  if(checkEndRoundCondition(state)) {
+    if(currentGameMode === 'multi') db.ref(`rooms/${currentRoom}/gameState`).set(state);
+    return;
+  }
 
   let nextTurnIndex = state.currentTurnIndex;
   do {
@@ -1244,7 +1403,6 @@ function playBotTurn() {
 
   const botCards = localState.hands['bot'];
   if(botCards && botCards.length > 0) {
-    // Règle Comtesse (Rang 8) pour le Bot : s'il a 8 avec 5 ou 7, il doit jouer le 8
     let playedCard;
     if(botCards.includes(8) && (botCards.includes(5) || botCards.includes(7))) {
       playedCard = 8;
@@ -1306,6 +1464,8 @@ function playBotTurn() {
 
     localState.lastPlayed = { player: "Robot", card: playedCard };
     localState.lastLog = logMsg;
+
+    if(checkEndRoundCondition(localState)) return;
 
     localState.currentTurnIndex = 0;
     if(localState.deck.length > 0 && (!localState.eliminated || !localState.eliminated[playerId])) {
