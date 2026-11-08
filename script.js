@@ -21,6 +21,7 @@ let localState = null;
 let currentBaronDuelData = null;
 let currentPrinceData = null;
 let currentChancellorData = null;
+let currentKingData = null;
 let selectedChancellorIndices = [];
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -205,7 +206,8 @@ function startGameLogic() {
       lastLog: "Nouvelle partie démarrée !",
       baronEvent: null,
       princeEvent: null,
-      chancellorEvent: null
+      chancellorEvent: null,
+      kingEvent: null
     };
 
     db.ref(`rooms/${currentRoom}/gameState`).set(gameState);
@@ -232,7 +234,8 @@ function startBotGame() {
     lastLog: "Partie contre le Robot commencée !",
     baronEvent: null,
     princeEvent: null,
-    chancellorEvent: null
+    chancellorEvent: null,
+    kingEvent: null
   };
 
   localState.hands[playerId].push(localState.deck.pop());
@@ -325,6 +328,7 @@ function updateGameBoard(state) {
   if(state.baronEvent && !currentBaronDuelData) checkAndDisplayBaronModal(state.baronEvent);
   if(state.princeEvent && !currentPrinceData) checkAndDisplayPrinceModal(state.princeEvent);
   if(state.chancellorEvent && !currentChancellorData) checkAndDisplayChancellorModal(state.chancellorEvent);
+  if(state.kingEvent && !currentKingData) checkAndDisplayKingModal(state.kingEvent);
 }
 
 // CLIC SUR LES CARTES
@@ -339,10 +343,164 @@ function onCardClicked(cardRank, state) {
     openPrinceModal(state);
   } else if(cardRank === 6) {
     initiateChancellorEffect(state, playerId);
+  } else if(cardRank === 7) {
+    openKingModal(state);
   } else if(cardRank === 9) {
     playPrincessCard(state);
   } else {
     executePlayCard(cardRank, state);
+  }
+}
+
+// --- RANG 7 : ROI ---
+function openKingModal(state) {
+  const targetSelect = document.getElementById('king-target-player');
+  targetSelect.innerHTML = '';
+
+  state.playerOrder.forEach(id => {
+    if(id !== playerId && (!state.eliminated || !state.eliminated[id])) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.innerText = state.playerNames ? state.playerNames[id] : id;
+      targetSelect.appendChild(opt);
+    }
+  });
+
+  if(targetSelect.options.length === 0) {
+    executePlayCard(7, state, "Le Roi est joué mais aucun joueur ne peut être ciblé !");
+    return;
+  }
+
+  document.getElementById('modal-king-select').style.display = 'flex';
+}
+
+function confirmKingSelection() {
+  document.getElementById('modal-king-select').style.display = 'none';
+  const targetId = document.getElementById('king-target-player').value;
+
+  const state = (currentGameMode === 'multi') ? null : localState;
+  if(currentGameMode === 'multi') {
+    db.ref(`rooms/${currentRoom}/gameState`).once('value').then(snap => {
+      initiateKingEffect(snap.val(), targetId);
+    });
+  } else {
+    initiateKingEffect(state, targetId);
+  }
+}
+
+function initiateKingEffect(state, targetId) {
+  const casterId = playerId;
+  const casterName = myPlayerName;
+  const targetName = state.playerNames[targetId] || "Robot";
+
+  // Carte du lanceur (sans le Roi qui est défaussé)
+  const casterCard = (state.hands[casterId].filter(c => c !== 7)[0] !== undefined)
+    ? state.hands[casterId].filter(c => c !== 7)[0]
+    : state.hands[casterId][0];
+
+  const targetCard = state.hands[targetId][0];
+
+  // Échange effectif des cartes dans la main
+  state.hands[casterId] = [targetCard];
+  state.hands[targetId] = [casterCard];
+
+  const kingEventData = {
+    casterId: casterId,
+    casterName: casterName,
+    newCasterCard: targetCard,
+    targetId: targetId,
+    targetName: targetName,
+    newTargetCard: casterCard
+  };
+
+  state.kingEvent = kingEventData;
+
+  if(currentGameMode === 'bot') {
+    checkAndDisplayKingModal(kingEventData);
+  } else {
+    db.ref(`rooms/${currentRoom}/gameState`).set(state);
+  }
+}
+
+function checkAndDisplayKingModal(kingData) {
+  currentKingData = kingData;
+
+  const subtitle = document.getElementById('king-action-subtitle');
+  const cardDisplay = document.getElementById('king-card-display');
+  const timerMsg = document.getElementById('king-timer-msg');
+
+  cardDisplay.innerHTML = '';
+  
+  const kingRoleObj = rolesData.find(r => r.rank === 7) || {};
+  const kingName = kingRoleObj.name || kingRoleObj.official || "Roi";
+
+  if(kingData.casterId === playerId || kingData.targetId === playerId) {
+    const isCaster = (kingData.casterId === playerId);
+    const newCardRank = isCaster ? kingData.newCasterCard : kingData.newTargetCard;
+    const opponentName = isCaster ? kingData.targetName : kingData.casterName;
+
+    subtitle.innerText = isCaster 
+      ? `Vous avez échangé votre main avec celle de ${opponentName} !`
+      : `${opponentName} a joué le ${kingName} et a échangé sa main avec la vôtre !`;
+
+    const newRole = rolesData.find(r => r.rank === newCardRank) || { rank: newCardRank, name: "Rang " + newCardRank };
+
+    cardDisplay.innerHTML = `
+      <div style="text-align:center;">
+        <div style="font-size:0.75rem; color:var(--accent); font-weight:bold; margin-bottom:4px;">Votre Nouvelle Carte</div>
+        <div class="card-playable" style="cursor:default;">
+          <div class="card-badge-num">${newRole.rank}</div>
+          <div class="card-title">${newRole.name || newRole.official}</div>
+          <div class="card-img-holder">
+            ${newRole.image ? `<img src="${newRole.image}">` : '<div style="height:100%; background:#15803d; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.6rem;">Sans Image</div>'}
+          </div>
+          <div class="card-desc-box">
+            <strong>${newRole.name || newRole.official}</strong><br>${newRole.power || ''}
+          </div>
+        </div>
+      </div>
+    `;
+  } else {
+    // SPECTATEURS
+    subtitle.innerText = `👑 ${kingData.casterName} a joué ${kingName} (Rang 7) contre ${kingData.targetName} !`;
+  }
+
+  document.getElementById('modal-king-action').style.display = 'flex';
+
+  let countdown = 3;
+  timerMsg.innerText = `Fermeture dans ${countdown}s...`;
+
+  const interval = setInterval(() => {
+    countdown--;
+    if(countdown > 0) {
+      timerMsg.innerText = `Fermeture dans ${countdown}s...`;
+    } else {
+      clearInterval(interval);
+      document.getElementById('modal-king-action').style.display = 'none';
+      finishKingTurn(kingData);
+    }
+  }, 1000);
+}
+
+function finishKingTurn(kingData) {
+  currentKingData = null;
+  const state = (currentGameMode === 'multi') ? null : localState;
+
+  function applyKingResult(currentState) {
+    currentState.kingEvent = null;
+    const kingRoleObj = rolesData.find(r => r.rank === 7) || {};
+    const kingName = kingRoleObj.name || kingRoleObj.official || "Roi";
+    const logMsg = `👑 ${kingData.casterName} a joué ${kingName} (Rang 7) et a échangé sa main avec ${kingData.targetName}.`;
+
+    executePlayCard(7, currentState, logMsg);
+  }
+
+  if(currentGameMode === 'multi') {
+    db.ref(`rooms/${currentRoom}/gameState`).once('value').then(snap => {
+      applyKingResult(snap.val());
+    });
+  } else {
+    applyKingResult(state);
   }
 }
 
@@ -436,9 +594,8 @@ function checkAndDisplayChancellorModal(chancellorData) {
           timerStatus.innerText = `Le Robot réfléchit... (${timeLeft}s)`;
         } else {
           clearInterval(interval);
-          // Le Robot sélectionne les 2 cartes les plus faibles à remettre sous la pioche
           const indexedOptions = chancellorData.options.map((val, idx) => ({ val, idx }));
-          indexedOptions.sort((a, b) => a.val - b.val); // Tri croissant
+          indexedOptions.sort((a, b) => a.val - b.val);
           
           const returnIndices = indexedOptions.slice(0, needed).map(item => item.idx);
           executeChancellorSubmit(returnIndices, chancellorData);
@@ -490,10 +647,8 @@ function executeChancellorSubmit(returnIndices, chancellorData) {
     const returnCards = returnIndices.map(i => chancellorData.options[i]);
     const keepCards = chancellorData.options.filter((_, i) => !returnIndices.includes(i));
 
-    // Garder la/les carte(s) restantes en main
     currentState.hands[activeId] = keepCards;
 
-    // Placer les cartes sélectionnées tout en dessous de la pioche
     returnCards.forEach(c => currentState.deck.unshift(c));
 
     currentState.chancellorEvent = null;
@@ -638,7 +793,8 @@ function executePrinceDiscard() {
 
   let isPrincessEliminated = (data.targetCard === 9);
 
-  let countdown = 5;
+  // PASSAGE À 3 SECONDES POUR LE PRINCE (DÉLAI CORRIGÉ)
+  let countdown = 3;
   timerMsg.innerText = isPrincessEliminated 
     ? `💀 C'était la Princesse (Rang 9) ! ${data.targetName} est ÉLIMINÉ(E) !` 
     : `Nouvelle carte piochée dans ${countdown}s...`;
@@ -1145,6 +1301,9 @@ function playBotTurn() {
       return;
     } else if(playedCard === 6) {
       initiateChancellorEffect(localState, "bot");
+      return;
+    } else if(playedCard === 7) {
+      initiateKingEffect(localState, playerId);
       return;
     } else if(playedCard === 9) {
       if(!localState.eliminated) localState.eliminated = {};
