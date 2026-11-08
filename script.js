@@ -311,7 +311,6 @@ function updateGameBoard(state) {
   });
 }
 
-// DÉTECTION DU RANG 1 (CARTE GARDE)
 function onCardClicked(cardRank, state) {
   if(cardRank === 1) { 
     openGuardModal(state);
@@ -362,7 +361,9 @@ function processGuardLogic(state, targetId, guessedRank) {
   const guessedRoleObj = rolesData.find(r => r.rank === guessedRank) || {};
   const guessedRoleName = guessedRoleObj.name || guessedRoleObj.official || guessedRank;
 
-  let logMsg = "";
+  let title = "";
+  let message = "";
+
   if(targetHand.includes(guessedRank)) {
     if(!state.eliminated) state.eliminated = {};
     state.eliminated[targetId] = true;
@@ -371,12 +372,25 @@ function processGuardLogic(state, targetId, guessedRank) {
     state.hands[targetId] = [];
     state.lastPlayed = { player: targetName, card: droppedCard };
     
-    logMsg = `🎯 ${myPlayerName} a deviné ${guessedRoleName} ! ${targetName} est ÉLIMINÉ !`;
+    title = "🎯 ÉLIMINATION !";
+    message = `<strong>${myPlayerName}</strong> a deviné que <strong>${targetName}</strong> avait la carte <strong>${guessedRoleName} (Rang ${guessedRank})</strong>.<br><br><span style="color:#ef4444; font-weight:bold;">${targetName} est éliminé(e) de la manche !</span>`;
   } else {
-    logMsg = `🔍 ${myPlayerName} a deviné ${guessedRoleName} sur ${targetName}... Raté !`;
+    title = "❌ MAUVAISE DÉDUCTION";
+    message = `<strong>${myPlayerName}</strong> a deviné la carte <strong>${guessedRoleName} (Rang ${guessedRank})</strong> sur <strong>${targetName}</strong>.<br><br><span style="color:#4ade80;">${targetName} n'a pas cette carte en main !</span>`;
   }
 
-  executePlayCard(1, state, logMsg);
+  showGuardResultModal(title, message);
+  executePlayCard(1, state, `${myPlayerName} a joué le Garde (Rang 1) sur ${targetName}`);
+}
+
+function showGuardResultModal(title, htmlMessage) {
+  document.getElementById('guard-result-title').innerText = title;
+  document.getElementById('guard-result-text').innerHTML = htmlMessage;
+  document.getElementById('modal-guard-result').style.display = 'flex';
+}
+
+function closeGuardResultModal() {
+  document.getElementById('modal-guard-result').style.display = 'none';
 }
 
 function executePlayCard(cardRank, state, customLog) {
@@ -435,9 +449,9 @@ function playBotTurn() {
       if(userHand.includes(actualGuess)) {
         if(!localState.eliminated) localState.eliminated = {};
         localState.eliminated[playerId] = true;
-        logMsg = `🤖 Robot a deviné ${guessedName} ! Vous êtes ÉLIMINÉ !`;
+        showGuardResultModal("💀 VOUS ÊTES ÉLIMINÉ !", `Le Robot a deviné que vous aviez <strong>${guessedName} (Rang ${actualGuess})</strong> !`);
       } else {
-        logMsg = `🤖 Robot a deviné ${guessedName} sur vous... Raté !`;
+        showGuardResultModal("🛡️ ATTAQUE ÉVITÉE !", `Le Robot a deviné <strong>${guessedName} (Rang ${actualGuess})</strong> sur vous... Mais vous ne l'avez pas !`);
       }
     }
 
