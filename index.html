@@ -118,10 +118,30 @@
       <div id="chancellor-cards-choices" style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;"></div>
       <div id="chancellor-timer-status" style="font-size: 0.85rem; color: var(--accent); font-weight: bold; margin-top: 10px;"></div>
       
-      <!-- BOUTON DE VALIDATION DES 2 CARTES -->
       <div style="margin-top: 15px;">
         <button type="button" id="btn-chancellor-confirm" class="btn btn-success" style="width: 100%; font-size: 1rem; padding: 10px; display: none;" disabled onclick="submitChancellorSelection()">Valider les 2 cartes (0/2) 📥</button>
       </div>
+    </div>
+  </div>
+
+  <!-- MODALE ROI (RANG 7) -->
+  <div id="modal-king-select" class="modal-overlay">
+    <div class="modal-content">
+      <h3 style="color: var(--accent); margin-bottom: 10px;">👑 Pouvoir du Roi (Rang 7)</h3>
+      <div class="form-group">
+        <label>Choisir un joueur avec qui échanger votre main :</label>
+        <select id="king-target-player"></select>
+      </div>
+      <button type="button" class="btn btn-success" style="margin-top: 15px; width: 100%;" onclick="confirmKingSelection()">Échanger les Mains 🔄</button>
+    </div>
+  </div>
+
+  <div id="modal-king-action" class="modal-overlay">
+    <div class="modal-content" style="border-color: var(--accent);">
+      <h3 style="color: var(--accent); margin-bottom: 10px;">👑 Échange du Roi</h3>
+      <p id="king-action-subtitle" style="font-size: 0.9rem; margin-bottom: 12px; color: white;"></p>
+      <div id="king-card-display" style="display: flex; justify-content: center; margin: 15px 0;"></div>
+      <div id="king-timer-msg" style="font-size: 0.85rem; color: var(--accent); font-weight: bold;"></div>
     </div>
   </div>
 
