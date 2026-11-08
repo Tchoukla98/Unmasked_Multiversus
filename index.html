@@ -62,8 +62,8 @@
   <header>
     <h1>🎭 UNMASKED - Multiversus</h1>
     <div class="nav-tabs">
-      <button class="tab-btn active" onclick="switchPage('config')">⚙️ Config Rôles (0-9)</button>
-      <button class="tab-btn" onclick="switchPage('game')">🎮 Espace de Jeu</button>
+      <button class="tab-btn active" id="tab-config-btn" onclick="switchTab('config')">⚙️ Config Rôles (0-9)</button>
+      <button class="tab-btn" id="tab-game-btn" onclick="switchTab('game')">🎮 Espace de Jeu</button>
     </div>
   </header>
 
@@ -77,7 +77,7 @@
         <input type="text" id="fb-db-url" value="https://unmasked-multiversus-default-rtdb.europe-west1.firebasedatabase.app">
       </div>
       <button class="btn" onclick="initFirebase()">Connecter Firebase</button>
-      <span id="fb-status" style="margin-left: 10px; font-size: 0.85rem; color: #4ade80; display: block; margin-top: 5px;">Statut : Connecté par défaut</span>
+      <span id="fb-status" style="margin-left: 10px; font-size: 0.85rem; color: #4ade80; display: block; margin-top: 5px;">Statut : Connexion en cours...</span>
     </div>
 
     <div class="actions-bar">
@@ -136,7 +136,6 @@
     let currentRoom = null;
     let myPlayerId = "p_" + Math.random().toString(36).substr(2, 5);
 
-    // Initialisation Firebase automatique avec votre URL
     window.onload = function() {
       initFirebase();
       renderConfig();
@@ -147,33 +146,37 @@
       if(!dbUrl) return;
 
       try {
-        if (!firebase.apps.length) {
+        if (typeof firebase !== 'undefined' && !firebase.apps.length) {
           firebase.initializeApp({ databaseURL: dbUrl });
         }
-        db = firebase.database();
-        document.getElementById('fb-status').innerText = "Statut : Connecté à Firebase ✅";
-        document.getElementById('fb-status').style.color = "#4ade80";
+        if (typeof firebase !== 'undefined') {
+          db = firebase.database();
+          document.getElementById('fb-status').innerText = "Statut : Connecté à Firebase ✅";
+          document.getElementById('fb-status').style.color = "#4ade80";
+        }
       } catch(e) {
         document.getElementById('fb-status').innerText = "Erreur connexion : " + e.message;
         document.getElementById('fb-status').style.color = "#ef4444";
       }
     }
 
-    function switchPage(page) {
+    function switchTab(page) {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      
       if(page === 'config') {
         document.getElementById('config-page').classList.add('active');
-        event.target.classList.add('active');
+        document.getElementById('tab-config-btn').classList.add('active');
       } else {
         document.getElementById('game-page').classList.add('active');
-        event.target.classList.add('active');
+        document.getElementById('tab-game-btn').classList.add('active');
         renderPreview();
       }
     }
 
     function renderConfig() {
       const container = document.getElementById('roles-container');
+      if(!container) return;
       container.innerHTML = '';
 
       currentRoles.forEach((role, index) => {
@@ -242,4 +245,68 @@
 
     function loadFromFirebase() {
       if(!db) return alert("Firebase n'est pas connecté.");
-      db.ref('roles_config').once('value').then(
+      db.ref('roles_config').once('value').then(snapshot => {
+        if(snapshot.exists()) {
+          currentRoles = snapshot.val();
+          saveToLocal();
+          renderConfig();
+          alert("Configuration chargée depuis Firebase !");
+        } else {
+          alert("Aucune configuration sur Firebase.");
+        }
+      });
+    }
+
+    function renderPreview() {
+      const container = document.getElementById('cards-preview');
+      if(!container) return;
+      container.innerHTML = '';
+      currentRoles.forEach(role => {
+        const div = document.createElement('div');
+        div.className = 'card-item';
+        div.innerHTML = `
+          <div style="font-weight:bold; color:var(--accent);">${role.rank} - ${role.name}</div>
+          <div style="font-size:0.75rem; color:#94a3b8;">(${role.official})</div>
+          ${role.image ? `<img src="${role.image}">` : '<div style="height:120px; background:#1e293b; margin-top:5px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.8rem; color:#64748b;">Pas d\'image</div>'}
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function joinOrCreateRoom() {
+      const code = document.getElementById('room-code').value.trim().toUpperCase();
+      const playerName = document.getElementById('player-name').value.trim() || "Joueur";
+
+      if(!code) return alert("Veuillez saisir un code de salon (ex: ABCD).");
+
+      currentRoom = code;
+      document.getElementById('current-room-id').innerText = currentRoom;
+      document.getElementById('active-room').style.display = 'block';
+
+      if(db) {
+        const playerRef = db.ref(`rooms/${currentRoom}/players/${myPlayerId}`);
+        playerRef.set({ name: playerName, id: myPlayerId });
+        playerRef.onDisconnect().remove();
+
+        db.ref(`rooms/${currentRoom}/players`).on('value', snapshot => {
+          const players = snapshot.val() || {};
+          const container = document.getElementById('players-container');
+          container.innerHTML = '';
+          Object.values(players).forEach(p => {
+            const badge = document.createElement('span');
+            badge.className = 'player-badge';
+            badge.innerText = p.name;
+            container.appendChild(badge);
+          });
+        });
+      } else {
+        document.getElementById('players-container').innerHTML = `<span class="player-badge">${playerName} (Mode Hors-Ligne)</span>`;
+      }
+    }
+
+    function startGame() {
+      alert("La partie dans le salon " + currentRoom + " va démarrer ! (Distribution des cartes...)");
+    }
+  </script>
+</body>
+</html>
