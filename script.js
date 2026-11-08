@@ -19,6 +19,7 @@ const playerId = "p_" + Math.floor(Math.random() * 10000);
 let myPlayerName = "Joueur";
 let localState = null;
 let currentBaronDuelData = null;
+let currentPrinceData = null;
 
 document.addEventListener("DOMContentLoaded", function() {
   renderConfig();
@@ -181,7 +182,7 @@ function startGameLogic() {
       [deck[i], deck[j]] = [deck[j], deck[i]];
     }
 
-    deck.pop();
+    const removedCard = deck.pop();
     const hands = {};
     const playerNames = {};
     playerIds.forEach(id => { 
@@ -192,6 +193,7 @@ function startGameLogic() {
 
     const gameState = {
       deck: deck,
+      removedCard: removedCard,
       hands: hands,
       playerNames: playerNames,
       eliminated: {},
@@ -199,7 +201,8 @@ function startGameLogic() {
       playerOrder: playerIds,
       lastPlayed: null,
       lastLog: "Nouvelle partie démarrée !",
-      baronEvent: null
+      baronEvent: null,
+      princeEvent: null
     };
 
     db.ref(`rooms/${currentRoom}/gameState`).set(gameState);
@@ -212,10 +215,11 @@ function startBotGame() {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
-  deck.pop();
+  const removedCard = deck.pop();
 
   localState = {
     deck: deck,
+    removedCard: removedCard,
     hands: { [playerId]: [deck.pop()], "bot": [deck.pop()] },
     playerNames: { [playerId]: myPlayerName, "bot": "Robot" },
     eliminated: {},
@@ -223,7 +227,8 @@ function startBotGame() {
     playerOrder: [playerId, "bot"],
     lastPlayed: null,
     lastLog: "Partie contre le Robot commencée !",
-    baronEvent: null
+    baronEvent: null,
+    princeEvent: null
   };
 
   localState.hands[playerId].push(localState.deck.pop());
@@ -316,6 +321,10 @@ function updateGameBoard(state) {
   if(state.baronEvent && !currentBaronDuelData) {
     checkAndDisplayBaronModal(state.baronEvent);
   }
+
+  if(state.princeEvent && !currentPrinceData) {
+    checkAndDisplayPrinceModal(state.princeEvent);
+  }
 }
 
 // DECLENCHEMENT DES EFFETS
@@ -326,7 +335,9 @@ function onCardClicked(cardRank, state) {
     openPriestModal(state);
   } else if(cardRank === 3) {
     openBaronModal(state);
-  } else if(cardRank === 9) { // RANG 9 : PRINCESSE
+  } else if(cardRank === 5) {
+    openPrinceModal(state);
+  } else if(cardRank === 9) {
     playPrincessCard(state);
   } else {
     executePlayCard(cardRank, state);
@@ -336,15 +347,193 @@ function onCardClicked(cardRank, state) {
 // --- RANG 9 : PRINCESSE ---
 function playPrincessCard(state) {
   if(!state.eliminated) state.eliminated = {};
-  state.eliminated[playerId] = true; // Joueur éliminé immédiatement
+  state.eliminated[playerId] = true;
 
   const princessObj = rolesData.find(r => r.rank === 9) || {};
   const princessName = princessObj.name || princessObj.official || "Princesse";
   const logMsg = `💀 ${myPlayerName} a défaussé ${princessName} (Rang 9) et est ÉLIMINÉ(E) !`;
 
-  // Vider la main du joueur
   state.hands[playerId] = [];
   executePlayCard(9, state, logMsg);
+}
+
+// --- RANG 5 : PRINCE ---
+function openPrinceModal(state) {
+  const targetSelect = document.getElementById('prince-target-player');
+  targetSelect.innerHTML = '';
+
+  state.playerOrder.forEach(id => {
+    if(!state.eliminated || !state.eliminated[id]) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.innerText = (id === playerId) ? `${myPlayerName} (Vous)` : (state.playerNames ? state.playerNames[id] : id);
+      targetSelect.appendChild(opt);
+    }
+  });
+
+  document.getElementById('modal-prince-select').style.display = 'flex';
+}
+
+function confirmPrinceSelection() {
+  document.getElementById('modal-prince-select').style.display = 'none';
+  const targetId = document.getElementById('prince-target-player').value;
+
+  const state = (currentGameMode === 'multi') ? null : localState;
+  if(currentGameMode === 'multi') {
+    db.ref(`rooms/${currentRoom}/gameState`).once('value').then(snap => {
+      initiatePrinceEffect(snap.val(), targetId);
+    });
+  } else {
+    initiatePrinceEffect(state, targetId);
+  }
+}
+
+function initiatePrinceEffect(state, targetId) {
+  const targetName = state.playerNames[targetId] || "Robot";
+  
+  // Carte que le joueur Y va devoir défausser
+  const targetCard = (targetId === playerId && state.hands[playerId].length > 1) 
+    ? state.hands[playerId].filter(c => c !== 5)[0] 
+    : state.hands[targetId][0];
+
+  const princeEventData = {
+    casterId: playerId,
+    casterName: myPlayerName,
+    targetId: targetId,
+    targetName: targetName,
+    targetCard: targetCard,
+    discarded: false
+  };
+
+  state.princeEvent = princeEventData;
+
+  if(currentGameMode === 'bot') {
+    checkAndDisplayPrinceModal(princeEventData);
+  } else {
+    db.ref(`rooms/${currentRoom}/gameState`).set(state);
+  }
+}
+
+function checkAndDisplayPrinceModal(princeData) {
+  currentPrinceData = princeData;
+
+  const subtitle = document.getElementById('prince-action-subtitle');
+  const cardHolder = document.getElementById('prince-card-display');
+  const timerMsg = document.getElementById('prince-timer-msg');
+  const btn = document.getElementById('btn-prince-discard');
+
+  cardHolder.innerHTML = '';
+  timerMsg.innerText = '';
+  
+  subtitle.innerHTML = `<strong>${princeData.casterName}</strong> utilise le Prince sur <strong>${princeData.targetName}</strong> !`;
+
+  if(princeData.targetId === playerId) {
+    btn.style.display = "block";
+    btn.innerText = "Défausser ma carte 🚮";
+  } else {
+    btn.style.display = "none";
+    timerMsg.innerText = `En attente que ${princeData.targetName} défausse sa carte...`;
+  }
+
+  document.getElementById('modal-prince-action').style.display = 'flex';
+
+  // Si c'est le Robot qui est ciblé, il défausse automatiquement après 1s
+  if(princeData.targetId === 'bot') {
+    setTimeout(executePrinceDiscard, 1000);
+  }
+}
+
+function executePrinceDiscard() {
+  const data = currentPrinceData;
+  if(!data) return;
+
+  const cardHolder = document.getElementById('prince-card-display');
+  const timerMsg = document.getElementById('prince-timer-msg');
+  const btn = document.getElementById('btn-prince-discard');
+
+  btn.style.display = "none";
+
+  const roleObj = rolesData.find(r => r.rank === data.targetCard) || { rank: data.targetCard, name: "Rang " + data.targetCard };
+  
+  cardHolder.innerHTML = `
+    <div style="text-align:center;">
+      <div style="font-size:0.75rem; color:#ef4444; font-weight:bold; margin-bottom:4px;">Carte Défaussée par ${data.targetName}</div>
+      <div class="card-playable" style="cursor:default;">
+        <div class="card-badge-num">${roleObj.rank}</div>
+        <div class="card-title">${roleObj.name || roleObj.official}</div>
+        <div class="card-img-holder">
+          ${roleObj.image ? `<img src="${roleObj.image}">` : '<div style="height:100%; background:#15803d; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.6rem;">Sans Image</div>'}
+        </div>
+        <div class="card-desc-box">
+          <strong>${roleObj.name || roleObj.official}</strong><br>${roleObj.power}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // ÉVALUATION DE LA RÈGLE N°9 (PRINCESSE)
+  let isPrincessEliminated = (data.targetCard === 9);
+
+  let countdown = 5;
+  timerMsg.innerText = isPrincessEliminated 
+    ? `💀 C'était la Princesse (Rang 9) ! ${data.targetName} est ÉLIMINÉ(E) !` 
+    : `Nouvelle carte piochée dans ${countdown}s...`;
+
+  const interval = setInterval(() => {
+    countdown--;
+    if(countdown > 0 && !isPrincessEliminated) {
+      timerMsg.innerText = `Nouvelle carte piochée dans ${countdown}s...`;
+    } else if(countdown <= 0) {
+      clearInterval(interval);
+      document.getElementById('modal-prince-action').style.display = 'none';
+      finishPrinceTurn(data, isPrincessEliminated);
+    }
+  }, 1000);
+}
+
+function finishPrinceTurn(data, isPrincessEliminated) {
+  currentPrinceData = null;
+  const targetId = data.targetId;
+  const state = (currentGameMode === 'multi') ? null : localState;
+
+  function applyPrinceResult(currentState) {
+    if(isPrincessEliminated) {
+      if(!currentState.eliminated) currentState.eliminated = {};
+      currentState.eliminated[targetId] = true;
+      currentState.hands[targetId] = [];
+      currentState.lastPlayed = { player: data.targetName, card: 9 };
+    } else {
+      // Le joueur retire l'ancienne carte et en pioche une nouvelle
+      const idx = currentState.hands[targetId].indexOf(data.targetCard);
+      if(idx > -1) currentState.hands[targetId].splice(idx, 1);
+
+      // Si la pioche est vide, pioche la carte écartée de début de partie
+      let newCard = (currentState.deck && currentState.deck.length > 0) 
+        ? currentState.deck.pop() 
+        : currentState.removedCard;
+
+      if(newCard !== undefined) {
+        currentState.hands[targetId].push(newCard);
+      }
+
+      currentState.lastPlayed = { player: data.targetName, card: data.targetCard };
+    }
+
+    currentState.princeEvent = null;
+    const logText = isPrincessEliminated 
+      ? `👑 ${data.casterName} a joué le Prince sur ${data.targetName} qui a défaussé la Princesse (Rang 9) et est ÉLIMINÉ(E) !`
+      : `👑 ${data.casterName} a forcé ${data.targetName} à défausser sa carte (Rang ${data.targetCard}) et à en repiocher une nouvelle !`;
+
+    executePlayCard(5, currentState, logText);
+  }
+
+  if(currentGameMode === 'multi') {
+    db.ref(`rooms/${currentRoom}/gameState`).once('value').then(snap => {
+      applyPrinceResult(snap.val());
+    });
+  } else {
+    applyPrinceResult(state);
+  }
 }
 
 // --- RANG 1 : GARDE ---
@@ -788,7 +977,11 @@ function playBotTurn() {
       };
       checkAndDisplayBaronModal(baronEventData);
       return;
-    } else if(playedCard === 9) { // Le Bot défausse accidentellement la Princesse
+    } else if(playedCard === 5) {
+      // Robot joue le Prince et cible le joueur
+      initiatePrinceEffect(localState, playerId);
+      return;
+    } else if(playedCard === 9) {
       if(!localState.eliminated) localState.eliminated = {};
       localState.eliminated['bot'] = true;
       logMsg = `💀 Robot a joué la Princesse (Rang 9) et s'est ÉLIMINÉ tout seul !`;
