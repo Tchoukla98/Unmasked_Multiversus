@@ -2,685 +2,400 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Love Letter - Tapis de Jeu</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unmasked Multiversus</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none;
-      -webkit-user-select: none;
+    :root {
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --bg: #14532d;
+      --card-bg: #166534;
+      --text: #f8fafc;
+      --accent: #eab308;
+      --border: #22c55e;
     }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 10px; min-height: 100vh; }
+    header { text-align: center; margin-bottom: 10px; }
+    h1 { color: var(--accent); font-size: 1.6rem; }
+    
+    .nav-tabs { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
+    .tab-btn { background: #15803d; border: 1px solid var(--accent); color: white; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+    .tab-btn.active { background: var(--accent); color: #000; }
+    
+    .page { display: none; max-width: 800px; margin: 0 auto; }
+    .page.active { display: block; }
+    
+    .panel { background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.1); }
+    .btn { background: var(--accent); color: #000; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .btn-secondary { background: #334155; color: white; }
+    .btn-success { background: #22c55e; color: white; }
+    
+    .role-card { background: #15803d; border: 1px solid var(--accent); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    .role-header { font-size: 1.1rem; font-weight: bold; color: var(--accent); }
+    .role-power { font-size: 0.8rem; background: #052e16; padding: 6px; border-radius: 4px; margin-top: 4px; }
+    
+    .form-group { margin-top: 6px; }
+    label { display: block; font-size: 0.75rem; color: #cbd5e1; }
+    input[type="text"], input[type="file"] { width: 100%; background: #052e16; border: 1px solid #22c55e; color: white; padding: 6px; border-radius: 4px; }
+    .preview-img { width: 50px; height: 70px; object-fit: cover; border-radius: 4px; margin-top: 4px; }
 
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #1b5e20;
-      color: #fff;
-      height: 100vh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .game-board {
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      height: 100vh;
-      max-width: 600px;
-      margin: 0 auto;
-      width: 100%;
-      background: radial-gradient(circle, #2e7d32 0%, #1b5e20 80%, #0d3b11 100%);
-      box-shadow: 0 0 20px rgba(0,0,0,0.8);
-      position: relative;
-    }
-
-    header {
-      background: rgba(0, 0, 0, 0.4);
-      padding: 10px 15px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 2px solid rgba(255, 215, 0, 0.3);
-    }
-
-    .title {
-      font-size: 1.1rem;
-      font-weight: bold;
-      color: #ffd700;
-    }
-
-    .status-badge {
-      font-size: 0.8rem;
-      padding: 4px 10px;
-      border-radius: 12px;
-      background: #ff9800;
-      color: #000;
-      font-weight: bold;
-    }
-
-    .btn {
-      background: #ffd700;
-      color: #000;
-      border: none;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 0.8rem;
-      margin-left: 2px;
-    }
-
-    .btn:active {
-      transform: scale(0.95);
-    }
-
-    /* Zone Adversaire */
-    .opponent-area {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding-top: 10px;
-    }
-
-    .player-label {
-      font-size: 0.85rem;
-      background: rgba(0,0,0,0.5);
-      padding: 2px 10px;
-      border-radius: 10px;
-      margin-bottom: 5px;
-    }
-
-    .opponent-hand {
-      display: flex;
-      justify-content: center;
-    }
-
-    .card-back {
-      width: 55px;
-      height: 80px;
-      background: linear-gradient(135deg, #b71c1c 25%, #d32f2f 25%, #d32f2f 50%, #b71c1c 50%, #b71c1c 75%, #d32f2f 75%);
-      background-size: 10px 10px;
-      border: 2px solid #fff;
-      border-radius: 6px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-      margin: 0 -10px;
-    }
-
-    /* Zone Centrale du Tapis */
-    .play-area {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
-
-    .played-card-zone {
-      text-align: center;
-      background: rgba(0,0,0,0.2);
-      padding: 10px;
-      border-radius: 10px;
-      border: 1px dashed rgba(255,255,255,0.2);
+    /* TAPIS DE JEU ET CARTES CORRIGÉES */
+    .table-field { background: #166534; border: 2px solid #22c55e; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+    .turn-banner { background: var(--accent); color: black; padding: 6px; border-radius: 6px; text-align: center; font-weight: bold; font-size: 0.95rem; }
+    
+    .hand-container { display: flex; justify-content: center; gap: 10px; padding-bottom: 10px; }
+    
+    /* FIX HAUTEUR ET AFFICHAGE CARTES */
+    .card-playable {
+      background: #052e16;
+      border: 2px solid var(--accent);
+      border-radius: 8px;
       width: 130px;
       height: 180px;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .deck-info {
-      position: absolute;
-      left: 15px;
-      font-size: 0.8rem;
-      background: rgba(0,0,0,0.5);
+      justify-content: space-between;
       padding: 6px;
-      border-radius: 6px;
-    }
-
-    /* Zone Joueur */
-    .player-area {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding-bottom: 20px;
-    }
-
-    .player-hand {
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-      margin-top: 10px;
-    }
-
-    /* Style des Cartes */
-    .card {
-      width: 105px;
-      height: 155px;
-      background: #fff;
-      color: #000;
-      border-radius: 8px;
-      border: 3px solid #ffd700;
-      box-shadow: 0 6px 12px rgba(0,0,0,0.5);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      cursor: pointer;
+      text-align: center;
       position: relative;
-      transition: transform 0.2s;
+      overflow: hidden;
     }
-
-    .card:hover {
-      transform: translateY(-10px);
-    }
-
-    .card-rank {
+    .card-badge-num {
       position: absolute;
       top: 4px;
       left: 4px;
-      background: #ffd700;
-      color: #000;
+      background: var(--accent);
+      color: black;
+      font-weight: bold;
       width: 22px;
       height: 22px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: bold;
-      font-size: 0.85rem;
-      z-index: 2;
+      font-size: 0.8rem;
     }
-
-    .card-img {
-      width: 100%;
-      height: 85px;
-      object-fit: cover;
-      background: #ccc;
-    }
-
-    .card-body {
-      padding: 4px;
+    .card-title { font-size: 0.8rem; font-weight: bold; margin-left: 20px; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-img-holder { height: 75px; width: 100%; margin: 2px 0; }
+    .card-img-holder img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+    .card-desc-box {
+      background: white;
+      color: black;
       font-size: 0.65rem;
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      flex: 1;
-    }
-
-    .card-title {
-      font-weight: bold;
-      font-size: 0.75rem;
-      margin-bottom: 2px;
-    }
-
-    /* Modales */
-    .modal {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.85);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      padding: 15px;
-    }
-
-    .modal-content {
-      background: #222;
-      border: 2px solid #ffd700;
-      border-radius: 12px;
-      padding: 15px;
-      max-width: 400px;
-      width: 100%;
-      max-height: 85vh;
-      overflow-y: auto;
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    .options-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    .custom-input {
-      width: 100%;
-      padding: 6px;
-      margin-top: 4px;
-      background: #333;
-      border: 1px solid #555;
-      color: #fff;
+      padding: 4px;
       border-radius: 4px;
-    }
-
-    .log-box {
-      font-size: 0.75rem;
-      color: #aaa;
-      max-height: 40px;
+      max-height: 55px;
       overflow-y: auto;
-      text-align: center;
-      margin-top: 5px;
+      line-height: 1.1;
+      text-align: left;
     }
   </style>
 </head>
 <body>
 
-<div class="game-board">
   <header>
-    <div class="title">👑 Love Letter</div>
-    <div id="statusBadge" class="status-badge">À votre tour</div>
-    <div>
-      <button class="btn" onclick="openModeModal()">🎮 Mode</button>
-      <button class="btn" onclick="openCustomModal()">🎨 Img</button>
-      <button class="btn" onclick="initGame()">🔄</button>
+    <h1>👑 Love Letter - Unmasked</h1>
+    <div class="nav-tabs">
+      <button type="button" class="tab-btn active" id="btn-tab-config">⚙️ Config Rôles (0-9)</button>
+      <button type="button" class="tab-btn" id="btn-tab-game">🎮 Tapis de Jeu</button>
     </div>
   </header>
 
-  <!-- Adversaire -->
-  <div class="opponent-area">
-    <div class="player-label"><span id="oppName">Adversaire</span> <span id="oppImmune"></span></div>
-    <div class="opponent-hand" id="opponentHand">
-      <div class="card-back"></div>
-    </div>
-  </div>
-
-  <!-- Tapis de jeu -->
-  <div class="play-area">
-    <div class="deck-info">Pioche: <b id="deckCount">16</b></div>
-    <div class="played-card-zone">
-      <div style="font-size:0.7rem; color:#aaa; margin-bottom:5px;">DERNIÈRE CARTE JOUÉE</div>
-      <div id="lastPlayedCard">Aucune</div>
-    </div>
-    <div class="log-box" id="gameLog">La partie commence.</div>
-  </div>
-
-  <!-- Main Joueur -->
-  <div class="player-area">
-    <div class="player-label"><span id="playerName">Votre Main</span></div>
-    <div class="player-hand" id="playerHand"></div>
-  </div>
-</div>
-
-<!-- Modal Choix du Mode -->
-<div id="modeModal" class="modal hidden">
-  <div class="modal-content" style="text-align: center;">
-    <h3>Choisir le Mode de Jeu</h3>
-    <div style="display:flex; flex-direction:column; gap:12px; margin-top:15px;">
-      <button class="btn" style="padding:10px;" onclick="setMode('bot')">🤖 Jouer contre le Robot</button>
-      <button class="btn" style="padding:10px;" onclick="setMode('pvp')">👥 Mode 2 Joueurs (Local / Pass & Play)</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Personnalisation -->
-<div id="customModal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Importer les images des cartes</h3>
-    <p style="font-size: 0.75rem; color:#ccc; margin-bottom:10px;">Les images sont automatiquement enregistrées dans la base locale du navigateur.</p>
-    <div id="customList"></div>
-    <button class="btn" style="width:100%; margin-top:15px;" onclick="closeCustomModal()">Fermer et Enregistrer</button>
-  </div>
-</div>
-
-<!-- Modal Effet Garde -->
-<div id="guardModal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Effet du Garde (Rang 1)</h3>
-    <p>Devinez la carte de l'adversaire :</p>
-    <div class="options-grid">
-      <button class="btn" onclick="submitGuardGuess(2)">2 - Espionne</button>
-      <button class="btn" onclick="submitGuardGuess(3)">3 - Baron</button>
-      <button class="btn" onclick="submitGuardGuess(4)">4 - Servante</button>
-      <button class="btn" onclick="submitGuardGuess(5)">5 - Prince</button>
-      <button class="btn" onclick="submitGuardGuess(6)">6 - Chancelier</button>
-      <button class="btn" onclick="submitGuardGuess(7)">7 - Comtesse</button>
-      <button class="btn" onclick="submitGuardGuess(8)">8 - Princesse</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Effet Chancelier -->
-<div id="chancellorModal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Effet du Chancelier (Rang 6)</h3>
-    <p style="font-size: 0.8rem;">Sélectionnez 2 cartes à remettre sous la pioche :</p>
-    <div id="chancellorCards" style="display:flex; gap:10px; justify-content:center; margin:15px 0;"></div>
-    <button class="btn" style="width:100%;" onclick="submitChancellor()">Valider la sélection</button>
-  </div>
-</div>
-
-<script>
-  const CARD_TYPES = {
-    1: { name: "Garde", count: 6, desc: "Devinez la main d'un joueur." },
-    2: { name: "Espionne", count: 2, desc: "Gagnez un point si personne d'autre ne la joue." },
-    3: { name: "Baron", count: 2, desc: "Comparez vos mains. La plus basse est éliminée." },
-    4: { name: "Servante", count: 2, desc: "Immunité jusqu'à votre prochain tour." },
-    5: { name: "Prince", count: 2, desc: "Un joueur défausse sa main et repioche." },
-    6: { name: "Chancelier", count: 2, desc: "Piochez 2 cartes, remettez-en 2 sous le paquet." },
-    7: { name: "Comtesse", count: 1, desc: "A défausser si vous avez le Prince ou le Chancelier." },
-    8: { name: "Princesse", count: 1, desc: "Si vous la défaussez, vous perdez la partie." }
-  };
-
-  let customImages = JSON.parse(localStorage.getItem('loveLetterImages') || '{}');
-  let gameMode = 'bot'; // 'bot' ou 'pvp'
-  let activePlayer = 0; // 0: Joueur 1, 1: Robot ou Joueur 2
-  let deck = [];
-  let hands = [[], []];
-  let immunity = [false, false];
-  let chancellorSelected = [];
-
-  function log(msg) {
-    document.getElementById('gameLog').innerText = msg;
-  }
-
-  function openModeModal() {
-    document.getElementById('modeModal').classList.remove('hidden');
-  }
-
-  function setMode(mode) {
-    gameMode = mode;
-    document.getElementById('modeModal').classList.add('hidden');
-    initGame();
-  }
-
-  function initGame() {
-    deck = [];
-    Object.keys(CARD_TYPES).forEach(rank => {
-      for(let i=0; i<CARD_TYPES[rank].count; i++) {
-        deck.push(parseInt(rank));
-      }
-    });
-    deck.sort(() => Math.random() - 0.5);
-
-    hands = [[deck.pop()], [deck.pop()]];
-    immunity = [false, false];
-    activePlayer = 0;
-
-    hands[0].push(deck.pop());
-
-    // Reset complet de la zone centrale
-    document.getElementById('lastPlayedCard').innerText = "Aucune";
-
-    render();
-    log(`Partie réinitialisée en mode ${gameMode === 'bot' ? 'Robot' : '2 Joueurs'} !`);
-  }
-
-  function getCardImg(rank) {
-    return customImages[rank] || `https://via.placeholder.com/150/1b5e20/ffffff?text=${CARD_TYPES[rank].name}`;
-  }
-
-  function renderCard(rank, clickable = false, onClickFn = '') {
-    const card = CARD_TYPES[rank];
-    const img = getCardImg(rank);
-    return `
-      <div class="card" ${clickable ? `onclick="${onClickFn}"` : ''}>
-        <div class="card-rank">${rank}</div>
-        <img src="${img}" class="card-img" alt="${card.name}"/>
-        <div class="card-body">
-          <div class="card-title">${card.name}</div>
-          <div>${card.desc}</div>
-        </div>
+  <!-- PAGE CONFIGURATION -->
+  <div id="page-config" class="page active">
+    <div class="panel">
+      <h3>🔥 Firebase Database</h3>
+      <div class="form-group">
+        <input type="text" id="fb-url" value="https://unmasked-multiversus-default-rtdb.europe-west1.firebasedatabase.app">
       </div>
-    `;
-  }
+      <button type="button" class="btn" id="btn-connect-fb" style="margin-top:6px;">Connecter Firebase</button>
+      <span id="fb-status" style="font-size:0.8rem; margin-left:8px;">Statut : Prêt</span>
+    </div>
 
-  function render() {
-    document.getElementById('deckCount').innerText = deck.length;
-    
-    const isBot = gameMode === 'bot';
-    document.getElementById('oppName').innerText = isBot ? "Adversaire (Bot)" : "Joueur 2";
-    document.getElementById('playerName').innerText = isBot ? "Votre Main" : `Joueur ${activePlayer + 1}`;
-    document.getElementById('oppImmune').innerText = immunity[1 - activePlayer] ? "🛡️" : "";
+    <div class="panel" style="display:flex; gap:6px; flex-wrap:wrap;">
+      <button type="button" class="btn" id="btn-save-local">Sauvegarder Local</button>
+      <button type="button" class="btn btn-secondary" id="btn-export-json">💾 Exporter Config (Images)</button>
+      <button type="button" class="btn btn-secondary" onclick="document.getElementById('file-import-json').click()">📂 Importer Config</button>
+      <input type="file" id="file-import-json" accept=".json" style="display:none;" onchange="importJSONConfig(this)">
+      <button type="button" class="btn btn-secondary" id="btn-save-fb">Firebase Enregistrer</button>
+      <button type="button" class="btn btn-secondary" id="btn-reset">Réinitialiser Rôles</button>
+    </div>
 
-    const statusMsg = isBot 
-      ? (activePlayer === 0 ? "À votre tour" : "Tour du Robot") 
-      : `Tour du Joueur ${activePlayer + 1}`;
-    document.getElementById('statusBadge').innerText = statusMsg;
+    <div id="roles-list"></div>
+  </div>
 
-    // Hand Adversaire
-    let oppHtml = '';
-    for(let i = 0; i < hands[1 - activePlayer].length; i++) {
-      oppHtml += '<div class="card-back"></div>';
-    }
-    document.getElementById('opponentHand').innerHTML = oppHtml;
+  <!-- PAGE TAPIS DE JEU -->
+  <div id="page-game" class="page">
+    <div class="panel" style="text-align: center;">
+      <h2>Salon Multijoueur</h2>
+      <div style="display: flex; gap: 6px; justify-content: center; margin-top: 8px;">
+        <input type="text" id="player-name" placeholder="Pseudo" style="width: 120px;" value="Giulian">
+        <input type="text" id="room-code" placeholder="Code Salon" style="width: 100px;" value="AAA">
+        <button type="button" class="btn btn-success" id="btn-join-room">Rejoindre</button>
+      </div>
 
-    // Hand Joueur Actif
-    let playerHtml = '';
-    const currentHand = hands[activePlayer];
-    const canPlay = isBot ? (activePlayer === 0) : true;
+      <div id="room-info" style="display: none; margin-top: 10px;">
+        <p>Joueurs : <span id="players-list"></span></p>
+        <button type="button" class="btn btn-success" id="btn-start-game" style="margin-top:6px;">Lancer la Partie 🚀</button>
+      </div>
+    </div>
 
-    currentHand.forEach((rank, idx) => {
-      playerHtml += renderCard(rank, canPlay, `playCard(${idx})`);
+    <div id="game-board" class="table-field" style="display: none;">
+      <div id="turn-banner" class="turn-banner">En attente...</div>
+
+      <div>
+        <h4 style="margin-bottom:6px; text-align:center;">Votre Main :</h4>
+        <div id="my-hand" class="hand-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ORDRE ET NUMÉROS DE CARTES CORRECTS (0 À 9)
+    const defaultRoles = [
+      { rank: 0, official: "Espionne", name: "Espionne", power: "Gagnez un point si vous êtes le seul joueur en vie à l'avoir défaussée.", image: "" },
+      { rank: 1, official: "Garde", name: "Garde", power: "Choisissez un joueur et nommez un rôle (sauf Garde). S'il l'a, il est éliminé.", image: "" },
+      { rank: 2, official: "Prêtre", name: "Prêtre", power: "Regardez secrètement la main d'un autre joueur.", image: "" },
+      { rank: 3, official: "Baron", name: "Baron", power: "Comparez votre main avec un autre joueur. La carte la plus basse est éliminée.", image: "" },
+      { rank: 4, official: "Servante", name: "Servante", power: "Vous êtes protégé contre les effets des cartes jusqu'à votre prochain tour.", image: "" },
+      { rank: 5, official: "Prince", name: "Prince", power: "Choisissez un joueur (ou vous). Il défausse sa main et en pioche une nouvelle.", image: "" },
+      { rank: 6, official: "Chancelier", name: "Chancelier", power: "Piochez 2 cartes, gardez-en 1 et remettez les 2 autres sous le paquet.", image: "" },
+      { rank: 7, official: "Roi", name: "Roi", power: "Échangez votre main avec celle d'un autre joueur.", image: "" },
+      { rank: 8, official: "Comtesse", name: "Comtesse", power: "Si vous avez le Roi (7) ou le Prince (5) en main, vous devez la défausser.", image: "" },
+      { rank: 9, official: "Princesse", name: "Princesse", power: "Si vous défaussez cette carte, vous êtes immédiatement éliminé.", image: "" }
+    ];
+
+    let rolesData = JSON.parse(localStorage.getItem('unmasked_roles')) || defaultRoles;
+    let db = null;
+    let currentRoom = null;
+    const playerId = "p_" + Math.floor(Math.random() * 10000);
+    let myPlayerName = "Joueur";
+
+    document.addEventListener("DOMContentLoaded", function() {
+      renderConfig();
+      setupEvents();
+      initFirebase();
     });
-    document.getElementById('playerHand').innerHTML = playerHtml;
-  }
 
-  function playCard(index) {
-    const currentHand = hands[activePlayer];
-    const card = currentHand.splice(index, 1)[0];
-    document.getElementById('lastPlayedCard').innerHTML = renderCard(card);
-    immunity[activePlayer] = false;
-
-    applyEffect(card);
-  }
-
-  function applyEffect(card) {
-    const opponent = 1 - activePlayer;
-    const oppIsImmune = immunity[opponent];
-
-    if(card === 8) { // Princesse
-      alert(`Princesse défaussée ! Joueur ${activePlayer + 1} a perdu.`);
-      initGame();
-      return;
+    function setupEvents() {
+      document.getElementById('btn-tab-config').onclick = () => switchTab('config');
+      document.getElementById('btn-tab-game').onclick = () => switchTab('game');
+      document.getElementById('btn-connect-fb').onclick = initFirebase;
+      document.getElementById('btn-save-local').onclick = saveLocal;
+      document.getElementById('btn-export-json').onclick = exportJSONConfig;
+      document.getElementById('btn-save-fb').onclick = saveFirebase;
+      document.getElementById('btn-reset').onclick = resetRoles;
+      document.getElementById('btn-join-room').onclick = joinRoom;
+      document.getElementById('btn-start-game').onclick = startGameLogic;
     }
 
-    if(card === 4) { // Servante
-      immunity[activePlayer] = true;
-      log(`Joueur ${activePlayer + 1} est protégé par la Servante.`);
-      endTurn();
-      return;
+    function switchTab(tab) {
+      document.getElementById('page-config').classList.toggle('active', tab === 'config');
+      document.getElementById('page-game').classList.toggle('active', tab === 'game');
+      document.getElementById('btn-tab-config').classList.toggle('active', tab === 'config');
+      document.getElementById('btn-tab-game').classList.toggle('active', tab === 'game');
     }
 
-    if(card === 1) { // Garde
-      if(activePlayer === 0 || gameMode === 'pvp') {
-        if(oppIsImmune) {
-          log("L'adversaire est protégé par la Servante !");
-          endTurn();
+    function renderConfig() {
+      const container = document.getElementById('roles-list');
+      container.innerHTML = '';
+      rolesData.forEach((role, idx) => {
+        const div = document.createElement('div');
+        div.className = 'role-card';
+        div.innerHTML = `
+          <div class="role-header">Rang ${role.rank} : ${role.official}</div>
+          <div class="role-power">${role.power}</div>
+          <div class="form-group">
+            <label>Nom Personnalisé :</label>
+            <input type="text" value="${role.name || ''}" onchange="rolesData[${idx}].name = this.value">
+          </div>
+          <div class="form-group">
+            <label>Image :</label>
+            <input type="file" accept="image/*" onchange="handleImageUpload(${idx}, this)">
+          </div>
+          ${role.image ? `<img src="${role.image}" class="preview-img">` : ''}
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function handleImageUpload(idx, input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => { rolesData[idx].image = e.target.result; renderConfig(); };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    function saveLocal() {
+      localStorage.setItem('unmasked_roles', JSON.stringify(rolesData));
+      alert("Sauvegardé localement !");
+    }
+
+    function exportJSONConfig() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(rolesData));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "unmasked_roles_config.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function importJSONConfig(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          try {
+            rolesData = JSON.parse(e.target.result);
+            saveLocal();
+            renderConfig();
+            alert("Configuration et images importées avec succès !");
+          } catch(err) {
+            alert("Fichier invalide.");
+          }
+        };
+        reader.readAsText(input.files[0]);
+      }
+    }
+
+    function resetRoles() {
+      if(confirm("Réinitialiser les rôles par défaut ?")) {
+        rolesData = JSON.parse(JSON.stringify(defaultRoles));
+        localStorage.removeItem('unmasked_roles');
+        renderConfig();
+      }
+    }
+
+    function initFirebase() {
+      const url = document.getElementById('fb-url').value.trim();
+      if (!url) return;
+      try {
+        if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+          firebase.initializeApp({ databaseURL: url });
+        }
+        if (typeof firebase !== 'undefined') {
+          db = firebase.database();
+          document.getElementById('fb-status').innerText = "Connecté ✅";
+        }
+      } catch(e) {
+        document.getElementById('fb-status').innerText = "Erreur : " + e.message;
+      }
+    }
+
+    function saveFirebase() {
+      if(db) db.ref('roles_config').set(rolesData).then(() => alert("Cartes enregistrées sur Firebase !"));
+    }
+
+    function joinRoom() {
+      const code = document.getElementById('room-code').value.trim().toUpperCase();
+      myPlayerName = document.getElementById('player-name').value.trim() || "Joueur";
+      if(!code) return alert("Code requis !");
+
+      currentRoom = code;
+      document.getElementById('room-info').style.display = 'block';
+
+      if(db) {
+        const pRef = db.ref(`rooms/${currentRoom}/players/${playerId}`);
+        pRef.set({ name: myPlayerName, id: playerId });
+        pRef.onDisconnect().remove();
+
+        db.ref(`rooms/${currentRoom}/players`).on('value', snap => {
+          const players = snap.val() || {};
+          document.getElementById('players-list').innerText = Object.values(players).map(p => p.name).join(', ');
+        });
+
+        db.ref(`rooms/${currentRoom}/gameState`).on('value', snap => {
+          const state = snap.val();
+          if(state) updateGameBoard(state);
+        });
+      }
+    }
+
+    function startGameLogic() {
+      if(!db) return;
+      db.ref(`rooms/${currentRoom}/players`).once('value').then(snap => {
+        const playersObj = snap.val();
+        if(!playersObj) return;
+        const playerIds = Object.keys(playersObj);
+
+        let deck = [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8, 9];
+        for (let i = deck.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [deck[i], deck[j]] = [deck[j], deck[i]];
+        }
+
+        deck.pop();
+        const hands = {};
+        playerIds.forEach(id => { hands[id] = [deck.pop()]; });
+        hands[playerIds[0]].push(deck.pop());
+
+        const gameState = {
+          deck: deck,
+          hands: hands,
+          currentTurnIndex: 0,
+          playerOrder: playerIds
+        };
+
+        db.ref(`rooms/${currentRoom}/gameState`).set(gameState);
+      });
+    }
+
+    function updateGameBoard(state) {
+      document.getElementById('game-board').style.display = 'flex';
+      const isMyTurn = (state.playerOrder[state.currentTurnIndex] === playerId);
+      
+      const banner = document.getElementById('turn-banner');
+      banner.innerText = isMyTurn ? "🎯 À VOTRE TOUR DE JOUER" : "⏳ Tour de l'adversaire...";
+      banner.style.background = isMyTurn ? "#22c55e" : "#eab308";
+
+      const handContainer = document.getElementById('my-hand');
+      handContainer.innerHTML = '';
+      const myCards = state.hands[playerId] || [];
+
+      myCards.forEach((cardRank) => {
+        const role = rolesData.find(r => r.rank === cardRank) || { rank: cardRank, name: "Carte " + cardRank, power: "" };
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'card-playable';
+        cardDiv.innerHTML = `
+          <div class="card-badge-num">${role.rank}</div>
+          <div class="card-title">${role.name}</div>
+          <div class="card-img-holder">
+            ${role.image ? `<img src="${role.image}">` : '<div style="height:100%; background:#15803d; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.6rem;">Sans Image</div>'}
+          </div>
+          <div class="card-desc-box">
+            <strong>${role.name}</strong><br>${role.power}
+          </div>
+        `;
+
+        if(isMyTurn) {
+          cardDiv.onclick = () => playCard(cardRank, state);
         } else {
-          document.getElementById('guardModal').classList.remove('hidden');
+          cardDiv.style.opacity = '0.6';
         }
-      } else {
-        const guess = Math.floor(Math.random() * 7) + 2;
-        log(`Le Bot a joué Garde et devine : ${CARD_TYPES[guess].name}`);
-        if(hands[0][0] === guess) {
-          alert("Le Bot a deviné votre carte ! Vous avez perdu.");
-          initGame();
-        } else {
-          endTurn();
-        }
+
+        handContainer.appendChild(cardDiv);
+      });
+    }
+
+    function playCard(cardRank, state) {
+      const idx = state.hands[playerId].indexOf(cardRank);
+      if(idx > -1) state.hands[playerId].splice(idx, 1);
+
+      let nextTurnIndex = (state.currentTurnIndex + 1) % state.playerOrder.length;
+      state.currentTurnIndex = nextTurnIndex;
+      const nextPlayerId = state.playerOrder[nextTurnIndex];
+
+      if(state.deck && state.deck.length > 0) {
+        if(!state.hands[nextPlayerId]) state.hands[nextPlayerId] = [];
+        state.hands[nextPlayerId].push(state.deck.pop());
       }
-      return;
+
+      db.ref(`rooms/${currentRoom}/gameState`).set(state);
     }
-
-    if(card === 3) { // Baron
-      if(!oppIsImmune) {
-        const p1Card = hands[activePlayer][0];
-        const p2Card = hands[opponent][0];
-        if(p1Card > p2Card) {
-          alert(`Victoire du Joueur ${activePlayer + 1} ! La carte adverse (${CARD_TYPES[p2Card].name}) était plus faible.`);
-          initGame();
-          return;
-        } else if(p2Card > p1Card) {
-          alert(`Défaite du Joueur ${activePlayer + 1} ! Sa carte (${CARD_TYPES[p1Card].name}) était plus faible.`);
-          initGame();
-          return;
-        } else {
-          log("Égalité parfaite entre les Barons !");
-        }
-      } else {
-        log("Adversaire protégé par la Servante.");
-      }
-      endTurn();
-      return;
-    }
-
-    if(card === 5) { // Prince
-      let target = oppIsImmune ? activePlayer : opponent;
-      let discarded = hands[target].pop();
-      log(`Prince joué : ${CARD_TYPES[discarded].name} défaussée.`);
-      if(discarded === 8) {
-        alert(`La Princesse a été défaussée ! Joueur ${target + 1} a perdu.`);
-        initGame();
-        return;
-      } else {
-        hands[target].push(deck.length > 0 ? deck.pop() : 1);
-        endTurn();
-      }
-      return;
-    }
-
-    if(card === 6) { // Chancelier
-      if(activePlayer === 0 || gameMode === 'pvp') {
-        if(deck.length > 0) hands[activePlayer].push(deck.pop());
-        if(deck.length > 0) hands[activePlayer].push(deck.pop());
-        openChancellorModal();
-      } else {
-        log("Le Bot a joué le Chancelier.");
-        endTurn();
-      }
-      return;
-    }
-
-    endTurn();
-  }
-
-  function submitGuardGuess(guess) {
-    document.getElementById('guardModal').classList.add('hidden');
-    const opponent = 1 - activePlayer;
-    if(hands[opponent][0] === guess) {
-      alert(`Bien vu ! Le Joueur ${activePlayer + 1} a deviné la carte. Victoire !`);
-      initGame();
-    } else {
-      log(`Raté ! L'adversaire n'avait pas le ${CARD_TYPES[guess].name}.`);
-      endTurn();
-    }
-  }
-
-  function openChancellorModal() {
-    chancellorSelected = [];
-    const container = document.getElementById('chancellorCards');
-    container.innerHTML = '';
-    const currentHand = hands[activePlayer];
-    currentHand.forEach((rank, idx) => {
-      const div = document.createElement('div');
-      div.innerHTML = renderCard(rank);
-      div.onclick = () => {
-        if(chancellorSelected.includes(idx)) {
-          chancellorSelected = chancellorSelected.filter(i => i !== idx);
-          div.style.opacity = "1";
-        } else if(chancellorSelected.length < 2) {
-          chancellorSelected.push(idx);
-          div.style.opacity = "0.4";
-        }
-      };
-      container.appendChild(div);
-    });
-    document.getElementById('chancellorModal').classList.remove('hidden');
-  }
-
-  function submitChancellor() {
-    const currentHand = hands[activePlayer];
-    if(chancellorSelected.length < 2 && currentHand.length > 1) {
-      alert("Veuillez sélectionner 2 cartes à remettre sous la pioche.");
-      return;
-    }
-    chancellorSelected.sort((a,b) => b-a).forEach(idx => {
-      const removed = currentHand.splice(idx, 1)[0];
-      deck.unshift(removed);
-    });
-    document.getElementById('chancellorModal').classList.add('hidden');
-    endTurn();
-  }
-
-  function endTurn() {
-    render();
-    if(deck.length === 0) {
-      const p1 = hands[0][0] || 0;
-      const p2 = hands[1][0] || 0;
-      if(p1 > p2) alert("Fin de la pioche : Victoire du Joueur 1 !");
-      else if(p2 > p1) alert("Fin de la pioche : Victoire du Joueur 2 / Bot !");
-      else alert("Fin de la pioche : Égalité !");
-      initGame();
-      return;
-    }
-
-    activePlayer = 1 - activePlayer;
-
-    if(gameMode === 'bot' && activePlayer === 1) {
-      render();
-      setTimeout(botTurn, 1000);
-    } else {
-      hands[activePlayer].push(deck.pop());
-      render();
-    }
-  }
-
-  function botTurn() {
-    hands[1].push(deck.pop());
-    immunity[1] = false;
-    const playIdx = Math.floor(Math.random() * hands[1].length);
-    const card = hands[1].splice(playIdx, 1)[0];
-    document.getElementById('lastPlayedCard').innerHTML = renderCard(card);
-    applyEffect(card);
-  }
-
-  // Modale & Stockage Local des Images
-  function openCustomModal() {
-    const list = document.getElementById('customList');
-    list.innerHTML = '';
-    Object.keys(CARD_TYPES).forEach(rank => {
-      list.innerHTML += `
-        <div style="margin-bottom:8px; font-size:0.8rem;">
-          <label>${rank} - ${CARD_TYPES[rank].name}</label>
-          <input type="text" class="custom-input" placeholder="URL Image" value="${customImages[rank] || ''}" onchange="updateImage(${rank}, this.value)">
-          <input type="file" style="margin-top:2px; font-size:0.7rem;" onchange="handleFileUpload(event, ${rank})">
-        </div>
-      `;
-    });
-    document.getElementById('customModal').classList.remove('hidden');
-  }
-
-  function updateImage(rank, value) {
-    customImages[rank] = value;
-    localStorage.setItem('loveLetterImages', JSON.stringify(customImages));
-  }
-
-  function handleFileUpload(e, rank) {
-    const file = e.target.files[0];
-    if(file) {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        customImages[rank] = evt.target.result;
-        localStorage.setItem('loveLetterImages', JSON.stringify(customImages));
-      };
-      reader.readAsDataURL(file);
-    }
-  }
-
-  function closeCustomModal() {
-    document.getElementById('customModal').classList.add('hidden');
-    render();
-  }
-
-  initGame();
-</script>
+  </script>
 </body>
 </html>
