@@ -142,6 +142,16 @@
     </div>
   </div>
 
+  <!-- MODALE FIN DE MANCHE (DECK ÉPUISÉ / VICTOIRE) -->
+  <div id="modal-end-round" class="modal-overlay">
+    <div class="modal-content" style="max-width: 480px; border-color: var(--accent);">
+      <h3 style="color: var(--accent); margin-bottom: 6px;">🏆 Fin de la Manche</h3>
+      <p id="end-round-subtitle" style="font-size: 0.85rem; color: white; margin-bottom: 12px;">La pioche est épuisée ! La carte la plus forte gagne cette manche.</p>
+      <div id="end-round-cards-container" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 15px 0;"></div>
+      <div id="end-round-status-msg" style="font-size: 0.9rem; color: var(--accent); font-weight: bold;"></div>
+    </div>
+  </div>
+
   <!-- PAGE CONFIGURATION -->
   <div id="page-config" class="page active">
     <div class="panel">
@@ -159,7 +169,7 @@
       <button type="button" class="btn btn-secondary" onclick="document.getElementById('file-import-json').click()">📂 Importer Config</button>
       <input type="file" id="file-import-json" accept=".json" style="display:none;" onchange="importJSONConfig(this)">
       <button type="button" class="btn btn-secondary" id="btn-save-fb">Firebase Enregistrer</button>
-      <button type="button" class="btn btn-secondary" id="btn-reset">Réinitialiser Rôles</button>
+      <button type="button" class="btn btn-reset" id="btn-reset">Réinitialiser Rôles</button>
     </div>
 
     <div id="roles-list"></div>
