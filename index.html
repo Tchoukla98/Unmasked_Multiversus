@@ -86,7 +86,7 @@
     </div>
   </div>
 
-  <!-- MODALE CHOIX DU PRINCE (RANG 5) -->
+  <!-- MODALE PRINCE (RANG 5) -->
   <div id="modal-prince-select" class="modal-overlay">
     <div class="modal-content">
       <h3 style="color: var(--accent); margin-bottom: 10px;">👑 Pouvoir du Prince (Rang 5)</h3>
@@ -98,17 +98,28 @@
     </div>
   </div>
 
-  <!-- MODALE ACTION / REVELATION PRINCE -->
   <div id="modal-prince-action" class="modal-overlay">
     <div class="modal-content" style="border-color: var(--accent);">
       <h3 style="color: var(--accent); margin-bottom: 10px;">👑 Action du Prince</h3>
       <p id="prince-action-subtitle" style="font-size: 0.9rem; margin-bottom: 12px; color: white;"></p>
-      
       <div id="prince-card-display" style="display: flex; justify-content: center; margin: 15px 0;"></div>
       <div id="prince-timer-msg" style="font-size: 0.85rem; color: var(--accent); font-weight: bold;"></div>
-
       <div style="margin-top: 15px;">
         <button type="button" id="btn-prince-discard" class="btn btn-success" style="width: 100%; font-size: 1rem; padding: 10px;" onclick="executePrinceDiscard()">Défausser ma carte 🚮</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALE CHANCELIER (RANG 6) -->
+  <div id="modal-chancellor" class="modal-overlay">
+    <div class="modal-content" style="max-width: 440px; border-color: var(--accent);">
+      <h3 id="chancellor-title" style="color: var(--accent); margin-bottom: 8px;">📜 Action du Chancelier</h3>
+      <p id="chancellor-subtitle" style="font-size: 0.85rem; color: #cbd5e1; margin-bottom: 12px;">Sélectionnez 2 cartes à remettre sous la pioche :</p>
+      
+      <div id="chancellor-cards-container" style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 10px 0;"></div>
+
+      <div style="margin-top: 15px;">
+        <button type="button" id="btn-chancellor-confirm" class="btn btn-success" style="width: 100%; font-size: 1rem; padding: 10px;" onclick="confirmChancellorSelection()">Valider et remettre sous le paquet 📥</button>
       </div>
     </div>
   </div>
