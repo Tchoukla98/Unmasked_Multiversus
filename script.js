@@ -301,6 +301,9 @@ function updateGameBoard(state) {
   handContainer.innerHTML = '';
   const myCards = state.hands[playerId] || [];
 
+  // RÈGLE COMTESSE (RANG 8) : Si Rang 8 est présent avec 5 ou 7, désactiver 5 et 7
+  const hasCountess = myCards.includes(8);
+
   myCards.forEach((cardRank) => {
     const role = rolesData.find(r => r.rank === cardRank) || { rank: cardRank, name: "Carte " + cardRank, power: "" };
     const cardDiv = document.createElement('div');
@@ -316,10 +319,16 @@ function updateGameBoard(state) {
       </div>
     `;
 
-    if(isMyTurn) {
+    const isCardDisabledByCountess = hasCountess && (cardRank === 5 || cardRank === 7);
+
+    if(isMyTurn && !isCardDisabledByCountess) {
       cardDiv.onclick = () => onCardClicked(cardRank, state);
     } else {
-      cardDiv.style.opacity = '0.6';
+      cardDiv.style.opacity = '0.5';
+      cardDiv.style.cursor = 'not-allowed';
+      if(isCardDisabledByCountess) {
+        cardDiv.title = "Désactivé : Vous devez jouer la Comtesse (Rang 8) !";
+      }
     }
 
     handContainer.appendChild(cardDiv);
@@ -349,6 +358,203 @@ function onCardClicked(cardRank, state) {
     playPrincessCard(state);
   } else {
     executePlayCard(cardRank, state);
+  }
+}
+
+// --- RANG 3 : BARON (CORRIGÉ : DEVOILEMENT AUTOMATIQUE APRÈS 3 SECONDES) ---
+function openBaronModal(state) {
+  const targetSelect = document.getElementById('baron-target-player');
+  targetSelect.innerHTML = '';
+
+  state.playerOrder.forEach(id => {
+    if(id !== playerId && (!state.eliminated || !state.eliminated[id])) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.innerText = state.playerNames ? state.playerNames[id] : id;
+      targetSelect.appendChild(opt);
+    }
+  });
+
+  if(targetSelect.options.length === 0) {
+    executePlayCard(3, state, "Le Baron est joué mais personne ne peut être ciblé !");
+    return;
+  }
+
+  document.getElementById('modal-baron-select').style.display = 'flex';
+}
+
+function confirmBaronSelection() {
+  document.getElementById('modal-baron-select').style.display = 'none';
+  const targetId = document.getElementById('baron-target-player').value;
+
+  const state = (currentGameMode === 'multi') ? null : localState;
+  if(currentGameMode === 'multi') {
+    db.ref(`rooms/${currentRoom}/gameState`).once('value').then(snap => {
+      initiateBaronDuel(snap.val(), targetId);
+    });
+  } else {
+    initiateBaronDuel(state, targetId);
+  }
+}
+
+function initiateBaronDuel(state, targetId) {
+  const challengerName = myPlayerName;
+  const targetName = state.playerNames[targetId] || "Robot";
+
+  const challengerCard = (state.hands[playerId].filter(c => c !== 3)[0] !== undefined) ? state.hands[playerId].filter(c => c !== 3)[0] : state.hands[playerId][0];
+  const targetCard = state.hands[targetId][0];
+
+  const baronEventData = {
+    challengerId: playerId,
+    challengerName: challengerName,
+    challengerCard: challengerCard,
+    targetId: targetId,
+    targetName: targetName,
+    targetCard: targetCard
+  };
+
+  state.baronEvent = baronEventData;
+
+  if(currentGameMode === 'bot') {
+    checkAndDisplayBaronModal(baronEventData);
+  } else {
+    db.ref(`rooms/${currentRoom}/gameState`).set(state);
+  }
+}
+
+function checkAndDisplayBaronModal(baronData) {
+  currentBaronDuelData = baronData;
+
+  const title = document.getElementById('baron-duel-title');
+  const subtitle = document.getElementById('baron-duel-subtitle');
+  const arena = document.getElementById('baron-duel-cards-container');
+  const outcome = document.getElementById('baron-outcome-msg');
+
+  title.innerText = "⚔️ Duel du Baron !";
+  outcome.innerText = "";
+  
+  subtitle.innerText = `${baronData.challengerName} défie ${baronData.targetName} en duel ! Révélation dans 3 secondes...`;
+  
+  arena.innerHTML = `
+    <div style="text-align:center;">
+      <div style="font-size:0.75rem; color:#4ade80; font-weight:bold;">${baronData.challengerName}</div>
+      <div class="card-back-style">❓</div>
+    </div>
+    <div style="font-weight:bold; color:var(--accent);">VS</div>
+    <div style="text-align:center;">
+      <div style="font-size:0.75rem; color:#ef4444; font-weight:bold;">${baronData.targetName}</div>
+      <div class="card-back-style">❓</div>
+    </div>
+  `;
+
+  document.getElementById('modal-baron-duel').style.display = 'flex';
+
+  // RÉVÉLATION AUTOMATIQUE APRÈS 3 SECONDES
+  setTimeout(() => {
+    revealBaronCards();
+  }, 3000);
+}
+
+function revealBaronCards() {
+  const data = currentBaronDuelData;
+  if(!data) return;
+
+  const arena = document.getElementById('baron-duel-cards-container');
+  const outcome = document.getElementById('baron-outcome-msg');
+  const subtitle = document.getElementById('baron-duel-subtitle');
+
+  subtitle.innerText = "Résultat du duel :";
+
+  const cRole = rolesData.find(r => r.rank === data.challengerCard) || { rank: data.challengerCard, name: "Rang " + data.challengerCard };
+  const tRole = rolesData.find(r => r.rank === data.targetCard) || { rank: data.targetCard, name: "Rang " + data.targetCard };
+
+  const isChallenger = (data.challengerId === playerId);
+  const cColor = isChallenger ? "#4ade80" : "#ef4444";
+  const tColor = !isChallenger ? "#4ade80" : "#ef4444";
+
+  arena.innerHTML = `
+    <div style="text-align:center;">
+      <div style="font-size:0.75rem; color:${cColor}; font-weight:bold;">${data.challengerName}</div>
+      ${getMiniCardHTML(cRole)}
+    </div>
+    <div style="font-weight:bold; color:var(--accent);">VS</div>
+    <div style="text-align:center;">
+      <div style="font-size:0.75rem; color:${tColor}; font-weight:bold;">${data.targetName}</div>
+      ${getMiniCardHTML(tRole)}
+    </div>
+  `;
+
+  let loserId = null;
+  let logText = "";
+
+  if(data.challengerCard < data.targetCard) {
+    loserId = data.challengerId;
+    logText = `⚔️ ${data.targetName} remporte le duel ! ${data.challengerName} (Rang ${data.challengerCard}) est ÉLIMINÉ !`;
+  } else if(data.targetCard < data.challengerCard) {
+    loserId = data.targetId;
+    logText = `⚔️ ${data.challengerName} remporte le duel ! ${data.targetName} (Rang ${data.targetCard}) est ÉLIMINÉ !`;
+  } else {
+    logText = `⚔️ ÉGALITÉ ! Personne n'est éliminé du duel.`;
+  }
+
+  if(loserId === playerId) {
+    outcome.innerHTML = `<span style="color:#ef4444;">💀 VOUS AVEZ PERDU LE DUEL !</span>`;
+  } else if(loserId !== null) {
+    outcome.innerHTML = `<span style="color:#4ade80;">🏆 VOUS AVEZ GAGNÉ LE DUEL !</span>`;
+  } else {
+    outcome.innerHTML = `<span style="color:var(--accent);">🤝 ÉGALITÉ !</span>`;
+  }
+
+  // FERMETURE AUTOMATIQUE 3 SECONDES APRÈS DÉVOILEMENT
+  setTimeout(() => {
+    finishBaronTurn(loserId, logText);
+  }, 3000);
+}
+
+function getMiniCardHTML(roleObj) {
+  return `
+    <div class="card-playable" style="cursor:default; width:110px; height:155px;">
+      <div class="card-badge-num">${roleObj.rank}</div>
+      <div class="card-title">${roleObj.name || roleObj.official}</div>
+      <div class="card-img-holder" style="height:60px;">
+        ${roleObj.image ? `<img src="${roleObj.image}">` : '<div style="height:100%; background:#15803d; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.6rem;">Sans Image</div>'}
+      </div>
+      <div class="card-desc-box" style="font-size:0.55rem; max-height:45px;">
+        <strong>${roleObj.name || roleObj.official}</strong>
+      </div>
+    </div>
+  `;
+}
+
+function finishBaronTurn(loserId, logText) {
+  document.getElementById('modal-baron-duel').style.display = 'none';
+  currentBaronDuelData = null;
+
+  const state = (currentGameMode === 'multi') ? null : localState;
+  
+  if(currentGameMode === 'multi') {
+    db.ref(`rooms/${currentRoom}/gameState`).once('value').then(snap => {
+      const currentState = snap.val();
+      if(loserId) {
+        if(!currentState.eliminated) currentState.eliminated = {};
+        currentState.eliminated[loserId] = true;
+        const droppedCard = currentState.hands[loserId].pop();
+        currentState.hands[loserId] = [];
+        currentState.lastPlayed = { player: currentState.playerNames[loserId], card: droppedCard };
+      }
+      currentState.baronEvent = null;
+      executePlayCard(3, currentState, logText);
+    });
+  } else {
+    if(loserId) {
+      if(!state.eliminated) state.eliminated = {};
+      state.eliminated[loserId] = true;
+      const droppedCard = state.hands[loserId].pop();
+      state.hands[loserId] = [];
+      state.lastPlayed = { player: state.playerNames[loserId], card: droppedCard };
+    }
+    state.baronEvent = null;
+    executePlayCard(3, state, logText);
   }
 }
 
@@ -393,14 +599,12 @@ function initiateKingEffect(state, targetId) {
   const casterName = myPlayerName;
   const targetName = state.playerNames[targetId] || "Robot";
 
-  // Carte du lanceur (sans le Roi qui est défaussé)
   const casterCard = (state.hands[casterId].filter(c => c !== 7)[0] !== undefined)
     ? state.hands[casterId].filter(c => c !== 7)[0]
     : state.hands[casterId][0];
 
   const targetCard = state.hands[targetId][0];
 
-  // Échange effectif des cartes dans la main
   state.hands[casterId] = [targetCard];
   state.hands[targetId] = [casterCard];
 
@@ -461,7 +665,6 @@ function checkAndDisplayKingModal(kingData) {
       </div>
     `;
   } else {
-    // SPECTATEURS
     subtitle.innerText = `👑 ${kingData.casterName} a joué ${kingName} (Rang 7) contre ${kingData.targetName} !`;
   }
 
@@ -793,7 +996,6 @@ function executePrinceDiscard() {
 
   let isPrincessEliminated = (data.targetCard === 9);
 
-  // PASSAGE À 3 SECONDES POUR LE PRINCE (DÉLAI CORRIGÉ)
   let countdown = 3;
   timerMsg.innerText = isPrincessEliminated 
     ? `💀 C'était la Princesse (Rang 9) ! ${data.targetName} est ÉLIMINÉ(E) !` 
@@ -1000,223 +1202,6 @@ function closePriestResultModal() {
   document.getElementById('modal-priest-result').style.display = 'none';
 }
 
-// --- RANG 3 : BARON ---
-function openBaronModal(state) {
-  const targetSelect = document.getElementById('baron-target-player');
-  targetSelect.innerHTML = '';
-
-  state.playerOrder.forEach(id => {
-    if(id !== playerId && (!state.eliminated || !state.eliminated[id])) {
-      const opt = document.createElement('option');
-      opt.value = id;
-      opt.innerText = state.playerNames ? state.playerNames[id] : id;
-      targetSelect.appendChild(opt);
-    }
-  });
-
-  if(targetSelect.options.length === 0) {
-    executePlayCard(3, state, "Le Baron est joué mais personne ne peut être ciblé !");
-    return;
-  }
-
-  document.getElementById('modal-baron-select').style.display = 'flex';
-}
-
-function confirmBaronSelection() {
-  document.getElementById('modal-baron-select').style.display = 'none';
-  const targetId = document.getElementById('baron-target-player').value;
-
-  const state = (currentGameMode === 'multi') ? null : localState;
-  if(currentGameMode === 'multi') {
-    db.ref(`rooms/${currentRoom}/gameState`).once('value').then(snap => {
-      initiateBaronDuel(snap.val(), targetId);
-    });
-  } else {
-    initiateBaronDuel(state, targetId);
-  }
-}
-
-function initiateBaronDuel(state, targetId) {
-  const challengerName = myPlayerName;
-  const targetName = state.playerNames[targetId] || "Robot";
-
-  const challengerCard = (state.hands[playerId].filter(c => c !== 3)[0] !== undefined) ? state.hands[playerId].filter(c => c !== 3)[0] : state.hands[playerId][0];
-  const targetCard = state.hands[targetId][0];
-
-  const baronEventData = {
-    challengerId: playerId,
-    challengerName: challengerName,
-    challengerCard: challengerCard,
-    targetId: targetId,
-    targetName: targetName,
-    targetCard: targetCard,
-    revealed: false
-  };
-
-  state.baronEvent = baronEventData;
-
-  if(currentGameMode === 'bot') {
-    checkAndDisplayBaronModal(baronEventData);
-  } else {
-    db.ref(`rooms/${currentRoom}/gameState`).set(state);
-  }
-}
-
-function checkAndDisplayBaronModal(baronData) {
-  currentBaronDuelData = baronData;
-
-  const title = document.getElementById('baron-duel-title');
-  const subtitle = document.getElementById('baron-duel-subtitle');
-  const arena = document.getElementById('baron-duel-cards-container');
-  const outcome = document.getElementById('baron-outcome-msg');
-  const btn = document.getElementById('btn-baron-action');
-
-  title.innerText = "⚔️ Duel du Baron !";
-  outcome.innerText = "";
-  
-  const isChallenger = (baronData.challengerId === playerId);
-  const isTarget = (baronData.targetId === playerId);
-
-  if(isChallenger || isTarget) {
-    subtitle.innerText = `${baronData.challengerName} défie ${baronData.targetName} en duel !`;
-    
-    arena.innerHTML = `
-      <div style="text-align:center;">
-        <div style="font-size:0.75rem; color:#4ade80; font-weight:bold;">${baronData.challengerName}</div>
-        <div class="card-back-style">❓</div>
-      </div>
-      <div style="font-weight:bold; color:var(--accent);">VS</div>
-      <div style="text-align:center;">
-        <div style="font-size:0.75rem; color:#ef4444; font-weight:bold;">${baronData.targetName}</div>
-        <div class="card-back-style">❓</div>
-      </div>
-    `;
-
-    btn.innerText = "Retourner ma carte 🃏";
-    btn.style.display = "block";
-    btn.onclick = () => revealBaronCards();
-  } else {
-    subtitle.innerText = `${baronData.challengerName} et ${baronData.targetName} sont en duel...`;
-    arena.innerHTML = `
-      <div style="text-align:center;">
-        <div style="font-size:0.75rem; font-weight:bold;">${baronData.challengerName}</div>
-        <div class="card-back-style">🃏</div>
-      </div>
-      <div style="font-weight:bold; color:var(--accent);">VS</div>
-      <div style="text-align:center;">
-        <div style="font-size:0.75rem; font-weight:bold;">${baronData.targetName}</div>
-        <div class="card-back-style">🃏</div>
-      </div>
-    `;
-    btn.innerText = "Fermer 👍";
-    btn.style.display = "block";
-    btn.onclick = () => { document.getElementById('modal-baron-duel').style.display = 'none'; };
-  }
-
-  document.getElementById('modal-baron-duel').style.display = 'flex';
-}
-
-function revealBaronCards() {
-  const data = currentBaronDuelData;
-  if(!data) return;
-
-  const arena = document.getElementById('baron-duel-cards-container');
-  const outcome = document.getElementById('baron-outcome-msg');
-  const btn = document.getElementById('btn-baron-action');
-
-  const cRole = rolesData.find(r => r.rank === data.challengerCard) || { rank: data.challengerCard, name: "Rang " + data.challengerCard };
-  const tRole = rolesData.find(r => r.rank === data.targetCard) || { rank: data.targetCard, name: "Rang " + data.targetCard };
-
-  const isChallenger = (data.challengerId === playerId);
-  const cColor = isChallenger ? "#4ade80" : "#ef4444";
-  const tColor = !isChallenger ? "#4ade80" : "#ef4444";
-
-  arena.innerHTML = `
-    <div style="text-align:center;">
-      <div style="font-size:0.75rem; color:${cColor}; font-weight:bold;">${data.challengerName}</div>
-      ${getMiniCardHTML(cRole)}
-    </div>
-    <div style="font-weight:bold; color:var(--accent);">VS</div>
-    <div style="text-align:center;">
-      <div style="font-size:0.75rem; color:${tColor}; font-weight:bold;">${data.targetName}</div>
-      ${getMiniCardHTML(tRole)}
-    </div>
-  `;
-
-  setTimeout(() => {
-    let loserId = null;
-    let logText = "";
-
-    if(data.challengerCard < data.targetCard) {
-      loserId = data.challengerId;
-      logText = `⚔️ ${data.targetName} remporte le duel ! ${data.challengerName} (Rang ${data.challengerCard}) est ÉLIMINÉ !`;
-    } else if(data.targetCard < data.challengerCard) {
-      loserId = data.targetId;
-      logText = `⚔️ ${data.challengerName} remporte le duel ! ${data.targetName} (Rang ${data.targetCard}) est ÉLIMINÉ !`;
-    } else {
-      logText = `⚔️ ÉGALITÉ ! Personne n'est éliminé du duel.`;
-    }
-
-    if(loserId === playerId) {
-      outcome.innerHTML = `<span style="color:#ef4444;">💀 VOUS AVEZ PERDU LE DUEL !</span>`;
-    } else if(loserId !== null) {
-      outcome.innerHTML = `<span style="color:#4ade80;">🏆 VOUS AVEZ GAGNÉ LE DUEL !</span>`;
-    } else {
-      outcome.innerHTML = `<span style="color:var(--accent);">🤝 ÉGALITÉ !</span>`;
-    }
-
-    btn.innerText = "Continuer le Jeu 🚀";
-    btn.onclick = () => finishBaronTurn(loserId, logText);
-  }, 1000);
-}
-
-function getMiniCardHTML(roleObj) {
-  return `
-    <div class="card-playable" style="cursor:default; width:110px; height:155px;">
-      <div class="card-badge-num">${roleObj.rank}</div>
-      <div class="card-title">${roleObj.name || roleObj.official}</div>
-      <div class="card-img-holder" style="height:60px;">
-        ${roleObj.image ? `<img src="${roleObj.image}">` : '<div style="height:100%; background:#15803d; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.6rem;">Sans Image</div>'}
-      </div>
-      <div class="card-desc-box" style="font-size:0.55rem; max-height:45px;">
-        <strong>${roleObj.name || roleObj.official}</strong>
-      </div>
-    </div>
-  `;
-}
-
-function finishBaronTurn(loserId, logText) {
-  document.getElementById('modal-baron-duel').style.display = 'none';
-  currentBaronDuelData = null;
-
-  const state = (currentGameMode === 'multi') ? null : localState;
-  
-  if(currentGameMode === 'multi') {
-    db.ref(`rooms/${currentRoom}/gameState`).once('value').then(snap => {
-      const currentState = snap.val();
-      if(loserId) {
-        if(!currentState.eliminated) currentState.eliminated = {};
-        currentState.eliminated[loserId] = true;
-        const droppedCard = currentState.hands[loserId].pop();
-        currentState.hands[loserId] = [];
-        currentState.lastPlayed = { player: currentState.playerNames[loserId], card: droppedCard };
-      }
-      currentState.baronEvent = null;
-      executePlayCard(3, currentState, logText);
-    });
-  } else {
-    if(loserId) {
-      if(!state.eliminated) state.eliminated = {};
-      state.eliminated[loserId] = true;
-      const droppedCard = state.hands[loserId].pop();
-      state.hands[loserId] = [];
-      state.lastPlayed = { player: state.playerNames[loserId], card: droppedCard };
-    }
-    state.baronEvent = null;
-    executePlayCard(3, state, logText);
-  }
-}
-
 // EXECUTION GENERALE DES TOURS
 function executePlayCard(cardRank, state, customLog) {
   const idx = state.hands[playerId].indexOf(cardRank);
@@ -1259,7 +1244,16 @@ function playBotTurn() {
 
   const botCards = localState.hands['bot'];
   if(botCards && botCards.length > 0) {
-    const playedCard = botCards.shift();
+    // Règle Comtesse (Rang 8) pour le Bot : s'il a 8 avec 5 ou 7, il doit jouer le 8
+    let playedCard;
+    if(botCards.includes(8) && (botCards.includes(5) || botCards.includes(7))) {
+      playedCard = 8;
+      const idx = botCards.indexOf(8);
+      botCards.splice(idx, 1);
+    } else {
+      playedCard = botCards.shift();
+    }
+
     const playedRoleObj = rolesData.find(r => r.rank === playedCard) || {};
     const cardName = playedRoleObj.name || playedRoleObj.official || playedCard;
     
@@ -1291,8 +1285,7 @@ function playBotTurn() {
         challengerCard: botCardVal,
         targetId: playerId,
         targetName: myPlayerName,
-        targetCard: userCardVal,
-        revealed: false
+        targetCard: userCardVal
       };
       checkAndDisplayBaronModal(baronEventData);
       return;
