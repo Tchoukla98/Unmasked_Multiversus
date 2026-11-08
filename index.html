@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Unmasked-multiversus</title>
-  <!-- Firebase SDK App & Realtime Database -->
+  <title>Unmasked Multiversus</title>
+  <!-- Firebase SDK Compat (chargement sécurisé) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
@@ -17,44 +17,39 @@
       --accent: #ec4899;
       --border: #334155;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
     body { background-color: var(--bg); color: var(--text); padding: 15px; }
     header { text-align: center; margin-bottom: 20px; }
-    h1 { color: var(--accent); font-size: 1.8rem; }
+    h1 { color: var(--accent); font-size: 1.8rem; margin-bottom: 10px; }
+    
     .nav-tabs { display: flex; justify-content: center; gap: 10px; margin-top: 15px; }
-    .tab-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); padding: 10px 15px; border-radius: 8px; cursor: pointer; }
-    .tab-btn.active { background: var(--primary); border-color: var(--primary); font-weight: bold; }
+    .tab-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); padding: 12px 18px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .tab-btn.active { background: var(--primary); border-color: var(--primary); }
+    
     .page { display: none; max-width: 800px; margin: 0 auto; }
     .page.active { display: block; }
     
-    .actions-bar { background: var(--card-bg); padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
-    .btn { background: var(--primary); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; }
-    .btn:hover { background: var(--primary-hover); }
+    .panel { background: var(--card-bg); padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid var(--border); }
+    .btn { background: var(--primary); color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-block; }
+    .btn:active { transform: scale(0.98); }
     .btn-secondary { background: #475569; }
     .btn-success { background: #22c55e; }
-    .btn-success:hover { background: #16a34a; }
     
-    .role-card-edit { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
-    .role-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-    .role-number { font-size: 1.5rem; font-weight: bold; color: var(--accent); }
-    .role-power { font-size: 0.9rem; background: #0f172a; padding: 10px; border-radius: 6px; color: #cbd5e1; border-left: 3px solid var(--primary); }
-    .form-group { display: flex; flex-direction: column; gap: 4px; }
-    label { font-size: 0.85rem; color: #94a3b8; }
-    input[type="text"], input[type="file"] { background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; font-size: 1rem; }
-    .preview-img { width: 60px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
-    .form-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-
-    .firebase-panel { background: var(--card-bg); padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid var(--primary); }
-    .firebase-panel input { width: 100%; margin-top: 5px; margin-bottom: 10px; }
+    .role-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 15px; }
+    .role-header { font-size: 1.3rem; font-weight: bold; color: var(--accent); margin-bottom: 8px; }
+    .role-power { font-size: 0.85rem; background: #0f172a; padding: 10px; border-radius: 6px; color: #cbd5e1; border-left: 3px solid var(--primary); margin-bottom: 10px; }
     
-    .game-lobby { text-align: center; background: var(--card-bg); padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid var(--border); }
+    .form-group { margin-bottom: 10px; }
+    label { display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 4px; }
+    input[type="text"], input[type="file"] { width: 100%; background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; }
+    
+    .preview-img { width: 80px; height: 110px; object-fit: cover; border-radius: 6px; margin-top: 8px; border: 1px solid var(--border); }
+    
     .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 20px; }
     .card-item { background: #0f172a; border: 2px solid var(--primary); border-radius: 10px; padding: 10px; text-align: center; }
     .card-item img { width: 100%; height: 140px; object-fit: cover; border-radius: 6px; margin-top: 5px; }
-
-    .room-status { background: #1e293b; border: 2px dashed var(--accent); padding: 15px; border-radius: 10px; margin-top: 15px; text-align: center; }
-    .players-list { display: flex; justify-content: center; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
-    .player-badge { background: var(--primary); padding: 6px 12px; border-radius: 20px; font-size: 0.9rem; font-weight: bold; }
+    
+    .badge { background: var(--primary); padding: 4px 10px; border-radius: 15px; font-size: 0.85rem; }
   </style>
 </head>
 <body>
@@ -62,65 +57,63 @@
   <header>
     <h1>🎭 UNMASKED - Multiversus</h1>
     <div class="nav-tabs">
-      <button class="tab-btn active" id="tab-config-btn" onclick="switchTab('config')">⚙️ Config Rôles (0-9)</button>
-      <button class="tab-btn" id="tab-game-btn" onclick="switchTab('game')">🎮 Espace de Jeu</button>
+      <button type="button" class="tab-btn active" id="btn-tab-config">⚙️ Config Rôles (0-9)</button>
+      <button type="button" class="tab-btn" id="btn-tab-game">🎮 Espace de Jeu</button>
     </div>
   </header>
 
-  <!-- PAGE DE CONFIGURATION DES RÔLES -->
-  <main id="config-page" class="page active">
+  <!-- PAGE CONFIGURATION DES RÔLES -->
+  <div id="page-config" class="page active">
     
-    <div class="firebase-panel">
-      <h3>🔥 Connexion Firebase Realtime Database</h3>
-      <div class="form-group">
-        <label>Database URL Firebase :</label>
-        <input type="text" id="fb-db-url" value="https://unmasked-multiversus-default-rtdb.europe-west1.firebasedatabase.app">
+    <div class="panel">
+      <h3>🔥 Firebase Realtime Database</h3>
+      <div class="form-group" style="margin-top: 10px;">
+        <label>URL de la base :</label>
+        <input type="text" id="fb-url" value="https://unmasked-multiversus-default-rtdb.europe-west1.firebasedatabase.app">
       </div>
-      <button class="btn" onclick="initFirebase()">Connecter Firebase</button>
-      <span id="fb-status" style="margin-left: 10px; font-size: 0.85rem; color: #4ade80; display: block; margin-top: 5px;">Statut : Connexion en cours...</span>
+      <button type="button" class="btn" id="btn-connect-fb">Connecter Firebase</button>
+      <div id="fb-status" style="margin-top: 8px; font-size: 0.85rem; color: #4ade80;">Statut : Prêt</div>
     </div>
 
-    <div class="actions-bar">
-      <div>
-        <button class="btn" onclick="saveToLocal()">Sauvegarder Localement</button>
-        <button class="btn btn-secondary" onclick="saveToFirebase()">Enregistrer sur Firebase</button>
-      </div>
-      <div>
-        <button class="btn btn-secondary" onclick="loadFromFirebase()">Charger Firebase</button>
-        <button class="btn btn-secondary" onclick="resetDefault()">Réinitialiser</button>
-      </div>
+    <div class="panel" style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <button type="button" class="btn" id="btn-save-local">Sauvegarder (Local)</button>
+      <button type="button" class="btn btn-secondary" id="btn-save-fb">Enregistrer sur Firebase</button>
+      <button type="button" class="btn btn-secondary" id="btn-load-fb">Charger Firebase</button>
+      <button type="button" class="btn btn-secondary" id="btn-reset">Réinitialiser</button>
     </div>
 
-    <div id="roles-container"></div>
-  </main>
+    <div id="roles-list"></div>
+  </div>
 
   <!-- PAGE ESPACE DE JEU -->
-  <main id="game-page" class="page">
-    <div class="game-lobby">
+  <div id="page-game" class="page">
+    <div class="panel" style="text-align: center;">
       <h2>Salon de Jeu Multijoueur</h2>
-      <p style="margin: 10px 0; color: #94a3b8;">Saisissez un code de salon pour créer ou rejoindre</p>
-      <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
-        <input type="text" id="player-name" placeholder="Votre Pseudo" style="width: 150px;" value="Joueur 1">
-        <input type="text" id="room-code" placeholder="Code (ex: ABCD)" style="width: 150px;">
-        <button class="btn btn-success" onclick="joinOrCreateRoom()">Créer / Rejoindre</button>
+      <p style="color: #94a3b8; margin: 8px 0;">Créez ou rejoignez une partie en ligne</p>
+      
+      <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 15px;">
+        <input type="text" id="player-name" placeholder="Votre Pseudo" style="width: 140px;" value="Joueur 1">
+        <input type="text" id="room-code" placeholder="Code Salon" style="width: 120px;">
+        <button type="button" class="btn btn-success" id="btn-join-room">Créer / Rejoindre</button>
       </div>
 
-      <div id="active-room" class="room-status" style="display: none;">
-        <h3>Salon : <span id="current-room-id" style="color: var(--accent);"></span></h3>
-        <p style="margin-top: 5px;">Joueurs connectés :</p>
-        <div id="players-container" class="players-list"></div>
-        <button class="btn btn-primary" style="margin-top: 10px;" onclick="startGame()">Lancer la Partie 🚀</button>
+      <div id="room-info" style="display: none; margin-top: 20px; padding: 15px; background: #0f172a; border-radius: 8px;">
+        <h3>Salon : <span id="display-room-code" style="color: var(--accent);"></span></h3>
+        <p style="margin-top: 8px;">Joueurs connectés :</p>
+        <div id="players-list" style="display: flex; gap: 8px; justify-content: center; margin: 10px 0; flex-wrap: wrap;"></div>
+        <button type="button" class="btn" id="btn-start-game">Lancer la Partie 🚀</button>
       </div>
     </div>
 
-    <h3>Aperçu des cartes du jeu (Synchronisées)</h3>
-    <div id="cards-preview" class="board"></div>
-  </main>
+    <h3>Aperçu des cartes du jeu</h3>
+    <div id="game-preview" class="board"></div>
+  </div>
 
   <script>
+    // Échelle des rôles originaux (De 9 à 0)
     const defaultRoles = [
       { rank: 9, official: "Princesse", name: "Princesse Céleste", power: "Si vous défaussez cette carte, vous êtes immédiatement éliminé.", image: "" },
-      { rank: 8, official: "Comtesse", name: "Comtesse de l'Ombre", power: "Si vous avez cette carte ET le Roi (7) ou le Prince (5), défaussez la Comtesse.", image: "" },
+      { rank: 8, official: "Comtesse", name: "Comtesse de l'Ombre", power: "Obligatoire de défausser si vous avez aussi le Roi (7) ou le Prince (5).", image: "" },
       { rank: 7, official: "Roi", name: "Souverain Multivers", power: "Échangez votre main avec un autre joueur.", image: "" },
       { rank: 6, official: "Chancelier", name: "Archiviste du Temps", power: "Piochez 2 cartes, gardez-en 1 et remettez les 2 autres sous le paquet.", image: "" },
       { rank: 5, official: "Prince", name: "Prince Héritier", power: "Un joueur défausse sa main et en pioche une nouvelle.", image: "" },
@@ -131,181 +124,186 @@
       { rank: 0, official: "Espionne", name: "Agent Infiltré", power: "Gagnez 1 point bonus si vous êtes le seul à avoir joué l'Espionne.", image: "" }
     ];
 
-    let currentRoles = JSON.parse(localStorage.getItem('unmasked_roles')) || defaultRoles;
-    let db = null;
-    let currentRoom = null;
-    let myPlayerId = "p_" + Math.random().toString(36).substr(2, 5);
-
-    window.onload = function() {
-      initFirebase();
-      renderConfig();
-    };
-
-    function initFirebase() {
-      const dbUrl = document.getElementById('fb-db-url').value.trim();
-      if(!dbUrl) return;
-
-      try {
-        if (typeof firebase !== 'undefined' && !firebase.apps.length) {
-          firebase.initializeApp({ databaseURL: dbUrl });
-        }
-        if (typeof firebase !== 'undefined') {
-          db = firebase.database();
-          document.getElementById('fb-status').innerText = "Statut : Connecté à Firebase ✅";
-          document.getElementById('fb-status').style.color = "#4ade80";
-        }
-      } catch(e) {
-        document.getElementById('fb-status').innerText = "Erreur connexion : " + e.message;
-        document.getElementById('fb-status').style.color = "#ef4444";
-      }
+    let rolesData = [];
+    try {
+      const saved = localStorage.getItem('unmasked_roles');
+      rolesData = saved ? JSON.parse(saved) : defaultRoles;
+    } catch(e) {
+      rolesData = defaultRoles;
     }
 
-    function switchTab(page) {
-      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    let db = null;
+    let currentRoom = null;
+    const playerId = "p_" + Math.floor(Math.random() * 100000);
+
+    // Initialisation sécurisée
+    document.addEventListener("DOMContentLoaded", function() {
+      renderConfig();
+      setupEvents();
+      initFirebase();
+    });
+
+    function setupEvents() {
+      document.getElementById('btn-tab-config').onclick = () => switchTab('config');
+      document.getElementById('btn-tab-game').onclick = () => switchTab('game');
+      document.getElementById('btn-connect-fb').onclick = initFirebase;
+      document.getElementById('btn-save-local').onclick = saveLocal;
+      document.getElementById('btn-save-fb').onclick = saveFirebase;
+      document.getElementById('btn-load-fb').onclick = loadFirebase;
+      document.getElementById('btn-reset').onclick = resetRoles;
+      document.getElementById('btn-join-room').onclick = joinRoom;
+      document.getElementById('btn-start-game').onclick = () => alert("Partie lancée dans le salon " + currentRoom + " !");
+    }
+
+    function switchTab(tab) {
+      document.getElementById('page-config').classList.toggle('active', tab === 'config');
+      document.getElementById('page-game').classList.toggle('active', tab === 'game');
+      document.getElementById('btn-tab-config').classList.toggle('active', tab === 'config');
+      document.getElementById('btn-tab-game').classList.toggle('active', tab === 'game');
       
-      if(page === 'config') {
-        document.getElementById('config-page').classList.add('active');
-        document.getElementById('tab-config-btn').classList.add('active');
-      } else {
-        document.getElementById('game-page').classList.add('active');
-        document.getElementById('tab-game-btn').classList.add('active');
-        renderPreview();
-      }
+      if(tab === 'game') renderPreview();
     }
 
     function renderConfig() {
-      const container = document.getElementById('roles-container');
-      if(!container) return;
+      const container = document.getElementById('roles-list');
       container.innerHTML = '';
 
-      currentRoles.forEach((role, index) => {
-        const card = document.createElement('div');
-        card.className = 'role-card-edit';
-        card.innerHTML = `
-          <div class="role-header">
-            <div>
-              <span class="role-number">Rang ${role.rank}</span>
-              <span style="font-weight: bold; margin-left: 10px;">${role.official}</span>
-            </div>
+      rolesData.forEach((role, idx) => {
+        const div = document.createElement('div');
+        div.className = 'role-card';
+        div.innerHTML = `
+          <div class="role-header">Rang ${role.rank} : ${role.official}</div>
+          <div class="role-power"><strong>Pouvoir :</strong> ${role.power}</div>
+          <div class="form-group">
+            <label>Nom du Personnage :</label>
+            <input type="text" value="${role.name || ''}" onchange="rolesData[${idx}].name = this.value">
           </div>
-          <div class="role-power">
-            <strong>Pouvoir Officiel (Rang ${role.rank}) :</strong> ${role.power}
+          <div class="form-group">
+            <label>Image (Fichier local) :</label>
+            <input type="file" accept="image/*" onchange="handleImageUpload(${idx}, this)">
           </div>
-          <div class="form-row">
-            <div class="form-group" style="flex: 1;">
-              <label>Nom du Personnage Personnalisé :</label>
-              <input type="text" value="${role.name}" onchange="updateRole(${index}, 'name', this.value)">
-            </div>
-            <div class="form-group">
-              <label>Illustration (Upload) :</label>
-              <input type="file" accept="image/*" onchange="uploadImage(${index}, this)">
-            </div>
-            ${role.image ? `<img src="${role.image}" class="preview-img">` : ''}
-          </div>
+          ${role.image ? `<img src="${role.image}" class="preview-img">` : ''}
         `;
-        container.appendChild(card);
+        container.appendChild(div);
       });
     }
 
-    function updateRole(index, key, value) {
-      currentRoles[index][key] = value;
-    }
-
-    function uploadImage(index, input) {
+    function handleImageUpload(idx, input) {
       if (input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {
-          currentRoles[index].image = e.target.result;
+          rolesData[idx].image = e.target.result;
           renderConfig();
         };
         reader.readAsDataURL(input.files[0]);
       }
     }
 
-    function saveToLocal() {
-      localStorage.setItem('unmasked_roles', JSON.stringify(currentRoles));
-      alert("Configuration enregistrée localement !");
+    function saveLocal() {
+      try {
+        localStorage.setItem('unmasked_roles', JSON.stringify(rolesData));
+        alert("Sauvegardé localement !");
+      } catch(e) {
+        alert("Erreur de stockage : Les images importées sont trop lourdes. Privilégiez des petites images.");
+      }
     }
 
-    function resetDefault() {
-      if(confirm("Réinitialiser les rôles par défaut ?")) {
-        currentRoles = JSON.parse(JSON.stringify(defaultRoles));
-        saveToLocal();
+    function resetRoles() {
+      if(confirm("Réinitialiser les cartes ?")) {
+        rolesData = JSON.parse(JSON.stringify(defaultRoles));
+        localStorage.removeItem('unmasked_roles');
         renderConfig();
       }
     }
 
-    function saveToFirebase() {
+    function initFirebase() {
+      const url = document.getElementById('fb-url').value.trim();
+      const statusEl = document.getElementById('fb-status');
+      
+      if (!url) return;
+
+      try {
+        if (typeof firebase !== 'undefined') {
+          if (!firebase.apps.length) {
+            firebase.initializeApp({ databaseURL: url });
+          }
+          db = firebase.database();
+          statusEl.innerText = "Statut : Connecté à Firebase ✅";
+          statusEl.style.color = "#4ade80";
+        } else {
+          statusEl.innerText = "Statut : Firebase non disponible (Mode Hors-Ligne)";
+          statusEl.style.color = "#f59e0b";
+        }
+      } catch(e) {
+        statusEl.innerText = "Erreur Firebase : " + e.message;
+        statusEl.style.color = "#ef4444";
+      }
+    }
+
+    function saveFirebase() {
       if(!db) return alert("Firebase n'est pas connecté.");
-      db.ref('roles_config').set(currentRoles)
-        .then(() => alert("Configuration synchronisée sur Firebase !"))
+      db.ref('roles_config').set(rolesData)
+        .then(() => alert("Cartes envoyées sur Firebase !"))
         .catch(err => alert("Erreur : " + err.message));
     }
 
-    function loadFromFirebase() {
+    function loadFirebase() {
       if(!db) return alert("Firebase n'est pas connecté.");
-      db.ref('roles_config').once('value').then(snapshot => {
-        if(snapshot.exists()) {
-          currentRoles = snapshot.val();
-          saveToLocal();
+      db.ref('roles_config').once('value').then(snap => {
+        if(snap.exists()) {
+          rolesData = snap.val();
           renderConfig();
-          alert("Configuration chargée depuis Firebase !");
+          alert("Cartes chargées depuis Firebase !");
         } else {
-          alert("Aucune configuration sur Firebase.");
+          alert("Aucune carte trouvée sur Firebase.");
         }
       });
     }
 
     function renderPreview() {
-      const container = document.getElementById('cards-preview');
-      if(!container) return;
+      const container = document.getElementById('game-preview');
       container.innerHTML = '';
-      currentRoles.forEach(role => {
-        const div = document.createElement('div');
-        div.className = 'card-item';
-        div.innerHTML = `
-          <div style="font-weight:bold; color:var(--accent);">${role.rank} - ${role.name}</div>
-          <div style="font-size:0.75rem; color:#94a3b8;">(${role.official})</div>
-          ${role.image ? `<img src="${role.image}">` : '<div style="height:120px; background:#1e293b; margin-top:5px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.8rem; color:#64748b;">Pas d\'image</div>'}
+      rolesData.forEach(r => {
+        const item = document.createElement('div');
+        item.className = 'card-item';
+        item.innerHTML = `
+          <div style="font-weight:bold; color:var(--accent);">${r.rank} - ${r.name || r.official}</div>
+          <div style="font-size:0.75rem; color:#94a3b8;">(${r.official})</div>
+          ${r.image ? `<img src="${r.image}">` : '<div style="height:120px; background:#1e293b; margin-top:5px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; color:#64748b;">Sans image</div>'}
         `;
-        container.appendChild(div);
+        container.appendChild(item);
       });
     }
 
-    function joinOrCreateRoom() {
+    function joinRoom() {
       const code = document.getElementById('room-code').value.trim().toUpperCase();
-      const playerName = document.getElementById('player-name').value.trim() || "Joueur";
+      const pName = document.getElementById('player-name').value.trim() || "Joueur";
 
-      if(!code) return alert("Veuillez saisir un code de salon (ex: ABCD).");
+      if(!code) return alert("Entrez un code de salon !");
 
       currentRoom = code;
-      document.getElementById('current-room-id').innerText = currentRoom;
-      document.getElementById('active-room').style.display = 'block';
+      document.getElementById('display-room-code').innerText = currentRoom;
+      document.getElementById('room-info').style.display = 'block';
 
       if(db) {
-        const playerRef = db.ref(`rooms/${currentRoom}/players/${myPlayerId}`);
-        playerRef.set({ name: playerName, id: myPlayerId });
-        playerRef.onDisconnect().remove();
+        const pRef = db.ref(`rooms/${currentRoom}/players/${playerId}`);
+        pRef.set({ name: pName, id: playerId });
+        pRef.onDisconnect().remove();
 
-        db.ref(`rooms/${currentRoom}/players`).on('value', snapshot => {
-          const players = snapshot.val() || {};
-          const container = document.getElementById('players-container');
-          container.innerHTML = '';
+        db.ref(`rooms/${currentRoom}/players`).on('value', snap => {
+          const players = snap.val() || {};
+          const list = document.getElementById('players-list');
+          list.innerHTML = '';
           Object.values(players).forEach(p => {
             const badge = document.createElement('span');
-            badge.className = 'player-badge';
+            badge.className = 'badge';
             badge.innerText = p.name;
-            container.appendChild(badge);
+            list.appendChild(badge);
           });
         });
       } else {
-        document.getElementById('players-container').innerHTML = `<span class="player-badge">${playerName} (Mode Hors-Ligne)</span>`;
+        document.getElementById('players-list').innerHTML = `<span class="badge">${pName} (Hors-Ligne)</span>`;
       }
-    }
-
-    function startGame() {
-      alert("La partie dans le salon " + currentRoom + " va démarrer ! (Distribution des cartes...)");
     }
   </script>
 </body>
