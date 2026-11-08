@@ -75,7 +75,7 @@
       transform: scale(0.95);
     }
 
-    /* Opponent Area */
+    /* Zone Adversaire */
     .opponent-area {
       display: flex;
       flex-direction: column;
@@ -107,7 +107,7 @@
       margin: 0 -10px;
     }
 
-    /* Middle Play Area */
+    /* Zone Centrale du Tapis */
     .play-area {
       flex: 1;
       display: flex;
@@ -140,7 +140,7 @@
       border-radius: 6px;
     }
 
-    /* Player Area */
+    /* Zone Joueur */
     .player-area {
       display: flex;
       flex-direction: column;
@@ -155,7 +155,7 @@
       margin-top: 10px;
     }
 
-    /* Card UI */
+    /* Style des Cartes */
     .card {
       width: 110px;
       height: 160px;
@@ -216,7 +216,7 @@
       margin-bottom: 2px;
     }
 
-    /* Modals & Controls */
+    /* Modales */
     .modal {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -295,7 +295,7 @@
     <div class="deck-info">Pioche: <b id="deckCount">16</b></div>
     <div class="played-card-zone">
       <div style="font-size:0.7rem; color:#aaa; margin-bottom:5px;">DERNIÈRE CARTE JOUÉE</div>
-      <div id="lastPlayedCard">Auccune</div>
+      <div id="lastPlayedCard">Aucune</div>
     </div>
     <div class="log-box" id="gameLog">La partie commence.</div>
   </div>
@@ -363,7 +363,6 @@
   let isPlayerTurn = true;
   let playerImmune = false;
   let oppImmune = false;
-  let pendingCard = null;
   let chancellorSelected = [];
 
   function log(msg) {
@@ -414,14 +413,12 @@
     document.getElementById('oppImmune').innerText = oppImmune ? "🛡️" : "";
     document.getElementById('statusBadge').innerText = isPlayerTurn ? "À votre tour" : "Tour de l'adversaire";
 
-    // Opponent Hand
     let oppHtml = '';
     for(let i=0; i<oppHand.length; i++) {
       oppHtml += '<div class="card-back"></div>';
     }
     document.getElementById('opponentHand').innerHTML = oppHtml;
 
-    // Player Hand
     let playerHtml = '';
     playerHand.forEach((rank, idx) => {
       playerHtml += renderCard(rank, isPlayerTurn, `playCard(${idx})`);
@@ -587,7 +584,6 @@
     applyEffect(card, false);
   }
 
-  // Custom Images Modal
   function openCustomModal() {
     const list = document.getElementById('customList');
     list.innerHTML = '';
