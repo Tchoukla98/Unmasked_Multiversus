@@ -7,7 +7,7 @@
   <!-- Firebase SDK Compat -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-  <!-- Fichier CSS externe -->
+  <!-- CSS Externe -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,7 +20,7 @@
     </div>
   </header>
 
-  <!-- MODALE POUVOIR DU GARDE (RANG 1) -->
+  <!-- MODALE CHOIX DU GARDE (RANG 1) -->
   <div id="modal-guard" class="modal-overlay">
     <div class="modal-content">
       <h3 style="color: var(--accent); margin-bottom: 10px;">⚔️ Pouvoir du Garde (Rang 1)</h3>
@@ -33,6 +33,15 @@
         <select id="guard-target-role"></select>
       </div>
       <button type="button" class="btn btn-success" style="margin-top: 15px; width: 100%;" onclick="confirmGuardAction()">Accuser 🎯</button>
+    </div>
+  </div>
+
+  <!-- MODALE POPUP RÉSULTAT DU GARDE -->
+  <div id="modal-guard-result" class="modal-overlay">
+    <div class="modal-content" style="border-color: var(--accent);">
+      <h3 id="guard-result-title" style="color: var(--accent); margin-bottom: 10px;">⚔️ Résultat du Garde</h3>
+      <p id="guard-result-text" style="font-size: 0.95rem; margin: 15px 0; line-height: 1.4; color: white;"></p>
+      <button type="button" class="btn btn-success" style="width: 100%; font-size: 1rem; padding: 10px;" onclick="closeGuardResultModal()">Compris 👍</button>
     </div>
   </div>
 
@@ -120,7 +129,7 @@
     </div>
   </div>
 
-  <!-- Fichier JavaScript externe -->
+  <!-- JavaScript Externe -->
   <script src="script.js"></script>
 </body>
 </html>
