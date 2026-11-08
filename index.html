@@ -64,11 +64,12 @@
       background: #ffd700;
       color: #000;
       border: none;
-      padding: 6px 12px;
+      padding: 6px 10px;
       border-radius: 6px;
       font-weight: bold;
       cursor: pointer;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
+      margin-left: 2px;
     }
 
     .btn:active {
@@ -123,8 +124,8 @@
       padding: 10px;
       border-radius: 10px;
       border: 1px dashed rgba(255,255,255,0.2);
-      width: 140px;
-      height: 200px;
+      width: 130px;
+      height: 180px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -157,8 +158,8 @@
 
     /* Style des Cartes */
     .card {
-      width: 110px;
-      height: 160px;
+      width: 105px;
+      height: 155px;
       background: #fff;
       color: #000;
       border-radius: 8px;
@@ -195,7 +196,7 @@
 
     .card-img {
       width: 100%;
-      height: 90px;
+      height: 85px;
       object-fit: cover;
       background: #ccc;
     }
@@ -220,7 +221,7 @@
     .modal {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.8);
+      background: rgba(0,0,0,0.85);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -235,7 +236,7 @@
       padding: 15px;
       max-width: 400px;
       width: 100%;
-      max-height: 80vh;
+      max-height: 85vh;
       overflow-y: auto;
     }
 
@@ -277,6 +278,7 @@
     <div class="title">👑 Love Letter</div>
     <div id="statusBadge" class="status-badge">À votre tour</div>
     <div>
+      <button class="btn" onclick="openModeModal()">🎮 Mode</button>
       <button class="btn" onclick="openCustomModal()">🎨 Img</button>
       <button class="btn" onclick="initGame()">🔄</button>
     </div>
@@ -284,7 +286,7 @@
 
   <!-- Adversaire -->
   <div class="opponent-area">
-    <div class="player-label">Adversaire <span id="oppImmune"></span></div>
+    <div class="player-label"><span id="oppName">Adversaire</span> <span id="oppImmune"></span></div>
     <div class="opponent-hand" id="opponentHand">
       <div class="card-back"></div>
     </div>
@@ -302,8 +304,19 @@
 
   <!-- Main Joueur -->
   <div class="player-area">
-    <div class="player-label">Votre Main</div>
+    <div class="player-label"><span id="playerName">Votre Main</span></div>
     <div class="player-hand" id="playerHand"></div>
+  </div>
+</div>
+
+<!-- Modal Choix du Mode -->
+<div id="modeModal" class="modal hidden">
+  <div class="modal-content" style="text-align: center;">
+    <h3>Choisir le Mode de Jeu</h3>
+    <div style="display:flex; flex-direction:column; gap:12px; margin-top:15px;">
+      <button class="btn" style="padding:10px;" onclick="setMode('bot')">🤖 Jouer contre le Robot</button>
+      <button class="btn" style="padding:10px;" onclick="setMode('pvp')">👥 Mode 2 Joueurs (Local / Pass & Play)</button>
+    </div>
   </div>
 </div>
 
@@ -311,9 +324,9 @@
 <div id="customModal" class="modal hidden">
   <div class="modal-content">
     <h3>Importer les images des cartes</h3>
-    <p style="font-size: 0.75rem; color:#ccc; margin-bottom:10px;">Entrez l'URL ou chargez une image pour chaque rôle.</p>
+    <p style="font-size: 0.75rem; color:#ccc; margin-bottom:10px;">Les images sont automatiquement enregistrées dans la base locale du navigateur.</p>
     <div id="customList"></div>
-    <button class="btn" style="width:100%; margin-top:15px;" onclick="closeCustomModal()">Fermer et Appliquer</button>
+    <button class="btn" style="width:100%; margin-top:15px;" onclick="closeCustomModal()">Fermer et Enregistrer</button>
   </div>
 </div>
 
@@ -356,17 +369,26 @@
     8: { name: "Princesse", count: 1, desc: "Si vous la défaussez, vous perdez la partie." }
   };
 
-  let customImages = {};
+  let customImages = JSON.parse(localStorage.getItem('loveLetterImages') || '{}');
+  let gameMode = 'bot'; // 'bot' ou 'pvp'
+  let activePlayer = 0; // 0: Joueur 1, 1: Robot ou Joueur 2
   let deck = [];
-  let playerHand = [];
-  let oppHand = [];
-  let isPlayerTurn = true;
-  let playerImmune = false;
-  let oppImmune = false;
+  let hands = [[], []];
+  let immunity = [false, false];
   let chancellorSelected = [];
 
   function log(msg) {
     document.getElementById('gameLog').innerText = msg;
+  }
+
+  function openModeModal() {
+    document.getElementById('modeModal').classList.remove('hidden');
+  }
+
+  function setMode(mode) {
+    gameMode = mode;
+    document.getElementById('modeModal').classList.add('hidden');
+    initGame();
   }
 
   function initGame() {
@@ -378,15 +400,17 @@
     });
     deck.sort(() => Math.random() - 0.5);
 
-    playerHand = [deck.pop()];
-    oppHand = [deck.pop()];
-    playerImmune = false;
-    oppImmune = false;
-    isPlayerTurn = true;
+    hands = [[deck.pop()], [deck.pop()]];
+    immunity = [false, false];
+    activePlayer = 0;
 
-    playerHand.push(deck.pop());
+    hands[0].push(deck.pop());
+
+    // Reset complet de la zone centrale
+    document.getElementById('lastPlayedCard').innerText = "Aucune";
+
     render();
-    log("Nouvelle partie lancée ! C'est votre tour.");
+    log(`Partie réinitialisée en mode ${gameMode === 'bot' ? 'Robot' : '2 Joueurs'} !`);
   }
 
   function getCardImg(rank) {
@@ -410,102 +434,126 @@
 
   function render() {
     document.getElementById('deckCount').innerText = deck.length;
-    document.getElementById('oppImmune').innerText = oppImmune ? "🛡️" : "";
-    document.getElementById('statusBadge').innerText = isPlayerTurn ? "À votre tour" : "Tour de l'adversaire";
+    
+    const isBot = gameMode === 'bot';
+    document.getElementById('oppName').innerText = isBot ? "Adversaire (Bot)" : "Joueur 2";
+    document.getElementById('playerName').innerText = isBot ? "Votre Main" : `Joueur ${activePlayer + 1}`;
+    document.getElementById('oppImmune').innerText = immunity[1 - activePlayer] ? "🛡️" : "";
 
+    const statusMsg = isBot 
+      ? (activePlayer === 0 ? "À votre tour" : "Tour du Robot") 
+      : `Tour du Joueur ${activePlayer + 1}`;
+    document.getElementById('statusBadge').innerText = statusMsg;
+
+    // Hand Adversaire
     let oppHtml = '';
-    for(let i=0; i<oppHand.length; i++) {
+    for(let i = 0; i < hands[1 - activePlayer].length; i++) {
       oppHtml += '<div class="card-back"></div>';
     }
     document.getElementById('opponentHand').innerHTML = oppHtml;
 
+    // Hand Joueur Actif
     let playerHtml = '';
-    playerHand.forEach((rank, idx) => {
-      playerHtml += renderCard(rank, isPlayerTurn, `playCard(${idx})`);
+    const currentHand = hands[activePlayer];
+    const canPlay = isBot ? (activePlayer === 0) : true;
+
+    currentHand.forEach((rank, idx) => {
+      playerHtml += renderCard(rank, canPlay, `playCard(${idx})`);
     });
     document.getElementById('playerHand').innerHTML = playerHtml;
   }
 
   function playCard(index) {
-    if(!isPlayerTurn) return;
-    const card = playerHand.splice(index, 1)[0];
+    const currentHand = hands[activePlayer];
+    const card = currentHand.splice(index, 1)[0];
     document.getElementById('lastPlayedCard').innerHTML = renderCard(card);
-    playerImmune = false;
+    immunity[activePlayer] = false;
 
-    applyEffect(card, true);
+    applyEffect(card);
   }
 
-  function applyEffect(card, isPlayer) {
-    const targetImmune = isPlayer ? oppImmune : playerImmune;
+  function applyEffect(card) {
+    const opponent = 1 - activePlayer;
+    const oppIsImmune = immunity[opponent];
 
     if(card === 8) { // Princesse
-      log((isPlayer ? "Vous avez" : "L'adversaire a") + " joué la Princesse ! Défaite instantanée.");
-      alert(isPlayer ? "Vous avez perdu !" : "Vous avez gagné !");
+      alert(`Princesse défaussée ! Joueur ${activePlayer + 1} a perdu.`);
+      initGame();
       return;
     }
 
     if(card === 4) { // Servante
-      if(isPlayer) playerImmune = true;
-      else oppImmune = true;
-      log((isPlayer ? "Vous êtes" : "L'adversaire est") + " protégé par la Servante.");
+      immunity[activePlayer] = true;
+      log(`Joueur ${activePlayer + 1} est protégé par la Servante.`);
       endTurn();
       return;
     }
 
     if(card === 1) { // Garde
-      if(isPlayer) {
-        if(targetImmune) { log("L'adversaire est protégé !"); endTurn(); }
-        else { document.getElementById('guardModal').classList.remove('hidden'); }
+      if(activePlayer === 0 || gameMode === 'pvp') {
+        if(oppIsImmune) {
+          log("L'adversaire est protégé par la Servante !");
+          endTurn();
+        } else {
+          document.getElementById('guardModal').classList.remove('hidden');
+        }
       } else {
         const guess = Math.floor(Math.random() * 7) + 2;
-        log(`Bot a joué Garde et devine : ${CARD_TYPES[guess].name}`);
-        if(playerHand[0] === guess) { alert("Le Bot a deviné votre carte ! Défaite."); }
-        else endTurn();
+        log(`Le Bot a joué Garde et devine : ${CARD_TYPES[guess].name}`);
+        if(hands[0][0] === guess) {
+          alert("Le Bot a deviné votre carte ! Vous avez perdu.");
+          initGame();
+        } else {
+          endTurn();
+        }
       }
       return;
     }
 
     if(card === 3) { // Baron
-      if(!targetImmune) {
-        const pCard = playerHand[0];
-        const oCard = oppHand[0];
-        if(pCard > oCard) alert("Victoire ! Votre carte était plus forte.");
-        else if(oCard > pCard) alert("Défaite ! La carte du bot était plus forte.");
-        else log("Égalité des Barons !");
-      } else log("Adversaire protégé.");
+      if(!oppIsImmune) {
+        const p1Card = hands[activePlayer][0];
+        const p2Card = hands[opponent][0];
+        if(p1Card > p2Card) {
+          alert(`Victoire du Joueur ${activePlayer + 1} ! La carte adverse (${CARD_TYPES[p2Card].name}) était plus faible.`);
+          initGame();
+          return;
+        } else if(p2Card > p1Card) {
+          alert(`Défaite du Joueur ${activePlayer + 1} ! Sa carte (${CARD_TYPES[p1Card].name}) était plus faible.`);
+          initGame();
+          return;
+        } else {
+          log("Égalité parfaite entre les Barons !");
+        }
+      } else {
+        log("Adversaire protégé par la Servante.");
+      }
       endTurn();
       return;
     }
 
     if(card === 5) { // Prince
-      if(isPlayer) {
-        let targetHand = targetImmune ? playerHand : oppHand;
-        let discarded = targetHand.pop();
-        log(`Prince joué : carte ${CARD_TYPES[discarded].name} défaussée.`);
-        if(discarded === 8) alert("La Princesse a été défaussée ! Victoire.");
-        else {
-          targetHand.push(deck.length > 0 ? deck.pop() : 1);
-          endTurn();
-        }
+      let target = oppIsImmune ? activePlayer : opponent;
+      let discarded = hands[target].pop();
+      log(`Prince joué : ${CARD_TYPES[discarded].name} défaussée.`);
+      if(discarded === 8) {
+        alert(`La Princesse a été défaussée ! Joueur ${target + 1} a perdu.`);
+        initGame();
+        return;
       } else {
-        let discarded = playerHand.pop();
-        log(`Bot joue Prince. Vous défaussez ${CARD_TYPES[discarded].name}.`);
-        if(discarded === 8) alert("Votre Princesse a été défaussée ! Défaite.");
-        else {
-          playerHand.push(deck.length > 0 ? deck.pop() : 1);
-          endTurn();
-        }
+        hands[target].push(deck.length > 0 ? deck.pop() : 1);
+        endTurn();
       }
       return;
     }
 
     if(card === 6) { // Chancelier
-      if(isPlayer) {
-        if(deck.length > 0) playerHand.push(deck.pop());
-        if(deck.length > 0) playerHand.push(deck.pop());
+      if(activePlayer === 0 || gameMode === 'pvp') {
+        if(deck.length > 0) hands[activePlayer].push(deck.pop());
+        if(deck.length > 0) hands[activePlayer].push(deck.pop());
         openChancellorModal();
       } else {
-        log("Bot a joué le Chancelier.");
+        log("Le Bot a joué le Chancelier.");
         endTurn();
       }
       return;
@@ -516,8 +564,10 @@
 
   function submitGuardGuess(guess) {
     document.getElementById('guardModal').classList.add('hidden');
-    if(oppHand[0] === guess) {
-      alert("Bien vu ! Vous avez deviné la carte de l'adversaire. Victoire !");
+    const opponent = 1 - activePlayer;
+    if(hands[opponent][0] === guess) {
+      alert(`Bien vu ! Le Joueur ${activePlayer + 1} a deviné la carte. Victoire !`);
+      initGame();
     } else {
       log(`Raté ! L'adversaire n'avait pas le ${CARD_TYPES[guess].name}.`);
       endTurn();
@@ -528,7 +578,8 @@
     chancellorSelected = [];
     const container = document.getElementById('chancellorCards');
     container.innerHTML = '';
-    playerHand.forEach((rank, idx) => {
+    const currentHand = hands[activePlayer];
+    currentHand.forEach((rank, idx) => {
       const div = document.createElement('div');
       div.innerHTML = renderCard(rank);
       div.onclick = () => {
@@ -546,12 +597,13 @@
   }
 
   function submitChancellor() {
-    if(chancellorSelected.length < 2 && playerHand.length > 1) {
+    const currentHand = hands[activePlayer];
+    if(chancellorSelected.length < 2 && currentHand.length > 1) {
       alert("Veuillez sélectionner 2 cartes à remettre sous la pioche.");
       return;
     }
     chancellorSelected.sort((a,b) => b-a).forEach(idx => {
-      const removed = playerHand.splice(idx, 1)[0];
+      const removed = currentHand.splice(idx, 1)[0];
       deck.unshift(removed);
     });
     document.getElementById('chancellorModal').classList.add('hidden');
@@ -561,29 +613,36 @@
   function endTurn() {
     render();
     if(deck.length === 0) {
-      alert(playerHand[0] > oppHand[0] ? "Fin du paquet : Victoire !" : "Fin du paquet : Défaite !");
+      const p1 = hands[0][0] || 0;
+      const p2 = hands[1][0] || 0;
+      if(p1 > p2) alert("Fin de la pioche : Victoire du Joueur 1 !");
+      else if(p2 > p1) alert("Fin de la pioche : Victoire du Joueur 2 / Bot !");
+      else alert("Fin de la pioche : Égalité !");
+      initGame();
       return;
     }
-    if(isPlayerTurn) {
-      isPlayerTurn = false;
+
+    activePlayer = 1 - activePlayer;
+
+    if(gameMode === 'bot' && activePlayer === 1) {
       render();
-      setTimeout(botTurn, 1200);
+      setTimeout(botTurn, 1000);
     } else {
-      isPlayerTurn = true;
-      playerHand.push(deck.pop());
+      hands[activePlayer].push(deck.pop());
       render();
     }
   }
 
   function botTurn() {
-    oppHand.push(deck.pop());
-    oppImmune = false;
-    const playIdx = Math.floor(Math.random() * oppHand.length);
-    const card = oppHand.splice(playIdx, 1)[0];
+    hands[1].push(deck.pop());
+    immunity[1] = false;
+    const playIdx = Math.floor(Math.random() * hands[1].length);
+    const card = hands[1].splice(playIdx, 1)[0];
     document.getElementById('lastPlayedCard').innerHTML = renderCard(card);
-    applyEffect(card, false);
+    applyEffect(card);
   }
 
+  // Modale & Stockage Local des Images
   function openCustomModal() {
     const list = document.getElementById('customList');
     list.innerHTML = '';
@@ -591,7 +650,7 @@
       list.innerHTML += `
         <div style="margin-bottom:8px; font-size:0.8rem;">
           <label>${rank} - ${CARD_TYPES[rank].name}</label>
-          <input type="text" class="custom-input" placeholder="URL Image" value="${customImages[rank] || ''}" onchange="customImages[${rank}]=this.value">
+          <input type="text" class="custom-input" placeholder="URL Image" value="${customImages[rank] || ''}" onchange="updateImage(${rank}, this.value)">
           <input type="file" style="margin-top:2px; font-size:0.7rem;" onchange="handleFileUpload(event, ${rank})">
         </div>
       `;
@@ -599,11 +658,19 @@
     document.getElementById('customModal').classList.remove('hidden');
   }
 
+  function updateImage(rank, value) {
+    customImages[rank] = value;
+    localStorage.setItem('loveLetterImages', JSON.stringify(customImages));
+  }
+
   function handleFileUpload(e, rank) {
     const file = e.target.files[0];
     if(file) {
       const reader = new FileReader();
-      reader.onload = (evt) => { customImages[rank] = evt.target.result; };
+      reader.onload = (evt) => {
+        customImages[rank] = evt.target.result;
+        localStorage.setItem('loveLetterImages', JSON.stringify(customImages));
+      };
       reader.readAsDataURL(file);
     }
   }
