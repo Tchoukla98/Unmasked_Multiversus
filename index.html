@@ -62,6 +62,7 @@
       text-align: center;
       position: relative;
       overflow: hidden;
+      cursor: pointer;
     }
     .card-badge-num {
       position: absolute;
@@ -92,6 +93,10 @@
       line-height: 1.1;
       text-align: left;
     }
+
+    .mode-select { display: flex; justify-content: center; gap: 10px; margin-bottom: 10px; }
+    .mode-btn { background: #052e16; border: 1px solid #22c55e; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+    .mode-btn.active { background: #22c55e; color: black; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -130,16 +135,29 @@
   <!-- PAGE TAPIS DE JEU -->
   <div id="page-game" class="page">
     <div class="panel" style="text-align: center;">
-      <h2>Salon Multijoueur</h2>
-      <div style="display: flex; gap: 6px; justify-content: center; margin-top: 8px;">
-        <input type="text" id="player-name" placeholder="Pseudo" style="width: 120px;" value="Giulian">
-        <input type="text" id="room-code" placeholder="Code Salon" style="width: 100px;" value="AAA">
-        <button type="button" class="btn btn-success" id="btn-join-room">Rejoindre</button>
+      <h2>Mode de Jeu</h2>
+      <div class="mode-select">
+        <button type="button" class="mode-btn active" id="mode-multi-btn" onclick="setGameMode('multi')">🌐 Multijoueur en Ligne</button>
+        <button type="button" class="mode-btn" id="mode-bot-btn" onclick="setGameMode('bot')">🤖 Joueur vs IA (Robot)</button>
       </div>
 
-      <div id="room-info" style="display: none; margin-top: 10px;">
-        <p>Joueurs : <span id="players-list"></span></p>
-        <button type="button" class="btn btn-success" id="btn-start-game" style="margin-top:6px;">Lancer la Partie 🚀</button>
+      <!-- LOBBY MULTIJOUEUR -->
+      <div id="multi-panel">
+        <div style="display: flex; gap: 6px; justify-content: center; margin-top: 8px;">
+          <input type="text" id="player-name" placeholder="Pseudo" style="width: 120px;" value="Giulian">
+          <input type="text" id="room-code" placeholder="Code Salon" style="width: 100px;" value="AAA">
+          <button type="button" class="btn btn-success" id="btn-join-room">Rejoindre</button>
+        </div>
+
+        <div id="room-info" style="display: none; margin-top: 10px;">
+          <p>Joueurs : <span id="players-list"></span></p>
+          <button type="button" class="btn btn-success" id="btn-start-game" style="margin-top:6px;">Lancer la Partie 🚀</button>
+        </div>
+      </div>
+
+      <!-- LOBBY BOT -->
+      <div id="bot-panel" style="display: none;">
+        <button type="button" class="btn btn-success" onclick="startBotGame()">Démarrer la Partie Solo vs IA 🤖</button>
       </div>
     </div>
 
@@ -154,7 +172,6 @@
   </div>
 
   <script>
-    // ORDRE ET NUMÉROS DE CARTES CORRECTS (0 À 9)
     const defaultRoles = [
       { rank: 0, official: "Espionne", name: "Espionne", power: "Gagnez un point si vous êtes le seul joueur en vie à l'avoir défaussée.", image: "" },
       { rank: 1, official: "Garde", name: "Garde", power: "Choisissez un joueur et nommez un rôle (sauf Garde). S'il l'a, il est éliminé.", image: "" },
@@ -171,8 +188,12 @@
     let rolesData = JSON.parse(localStorage.getItem('unmasked_roles')) || defaultRoles;
     let db = null;
     let currentRoom = null;
+    let currentGameMode = 'multi';
     const playerId = "p_" + Math.floor(Math.random() * 10000);
     let myPlayerName = "Joueur";
+
+    // État du jeu local pour mode BOT
+    let localState = null;
 
     document.addEventListener("DOMContentLoaded", function() {
       renderConfig();
@@ -197,6 +218,14 @@
       document.getElementById('page-game').classList.toggle('active', tab === 'game');
       document.getElementById('btn-tab-config').classList.toggle('active', tab === 'config');
       document.getElementById('btn-tab-game').classList.toggle('active', tab === 'game');
+    }
+
+    function setGameMode(mode) {
+      currentGameMode = mode;
+      document.getElementById('mode-multi-btn').classList.toggle('active', mode === 'multi');
+      document.getElementById('mode-bot-btn').classList.toggle('active', mode === 'bot');
+      document.getElementById('multi-panel').style.display = (mode === 'multi') ? 'block' : 'none';
+      document.getElementById('bot-panel').style.display = (mode === 'bot') ? 'block' : 'none';
     }
 
     function renderConfig() {
@@ -344,12 +373,33 @@
       });
     }
 
+    // LANCEUR DE PARTIE CONTRE L'IA
+    function startBotGame() {
+      let deck = [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8, 9];
+      for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+      }
+      deck.pop();
+
+      localState = {
+        deck: deck,
+        hands: { [playerId]: [deck.pop()], "bot": [deck.pop()] },
+        currentTurnIndex: 0,
+        playerOrder: [playerId, "bot"]
+      };
+
+      // Le joueur commence et pioche sa 2ème carte
+      localState.hands[playerId].push(localState.deck.pop());
+      updateGameBoard(localState);
+    }
+
     function updateGameBoard(state) {
       document.getElementById('game-board').style.display = 'flex';
       const isMyTurn = (state.playerOrder[state.currentTurnIndex] === playerId);
       
       const banner = document.getElementById('turn-banner');
-      banner.innerText = isMyTurn ? "🎯 À VOTRE TOUR DE JOUER" : "⏳ Tour de l'adversaire...";
+      banner.innerText = isMyTurn ? "🎯 À VOTRE TOUR DE JOUER" : "⏳ Tour de l'Adversaire / Robot...";
       banner.style.background = isMyTurn ? "#22c55e" : "#eab308";
 
       const handContainer = document.getElementById('my-hand');
@@ -394,7 +444,34 @@
         state.hands[nextPlayerId].push(state.deck.pop());
       }
 
-      db.ref(`rooms/${currentRoom}/gameState`).set(state);
+      if(currentGameMode === 'multi') {
+        db.ref(`rooms/${currentRoom}/gameState`).set(state);
+      } else {
+        localState = state;
+        updateGameBoard(localState);
+
+        // Si c'est au tour de l'IA (bot)
+        if(nextPlayerId === 'bot') {
+          setTimeout(playBotTurn, 1200);
+        }
+      }
+    }
+
+    function playBotTurn() {
+      if(!localState || localState.playerOrder[localState.currentTurnIndex] !== 'bot') return;
+
+      const botCards = localState.hands['bot'];
+      if(botCards && botCards.length > 0) {
+        // L'IA défausse sa première carte
+        const playedCard = botCards.shift();
+
+        // Passer au tour du joueur
+        localState.currentTurnIndex = 0;
+        if(localState.deck.length > 0) {
+          localState.hands[playerId].push(localState.deck.pop());
+        }
+        updateGameBoard(localState);
+      }
     }
   </script>
 </body>
