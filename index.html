@@ -4,10 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Unmasked Multiversus</title>
-  <!-- Firebase SDK Compat -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-  <!-- CSS Externe -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -36,7 +34,7 @@
     </div>
   </div>
 
-  <!-- MODALE POPUP RÉSULTAT DU GARDE -->
+  <!-- MODALE RÉSULTAT DU GARDE -->
   <div id="modal-guard-result" class="modal-overlay">
     <div class="modal-content" style="border-color: var(--accent);">
       <h3 id="guard-result-title" style="color: var(--accent); margin-bottom: 10px;">⚔️ Résultat du Garde</h3>
@@ -57,12 +55,40 @@
     </div>
   </div>
 
-  <!-- MODALE RÉSULTAT DU PRÊTRE (RÉVÉLATION DE LA CARTE) -->
+  <!-- MODALE RÉSULTAT DU PRÊTRE -->
   <div id="modal-priest-result" class="modal-overlay">
     <div class="modal-content" style="border-color: var(--accent);">
       <h3 id="priest-result-title" style="color: var(--accent); margin-bottom: 10px;">👁️ Main Espionnée</h3>
       <div id="priest-result-card" style="display: flex; justify-content: center; margin: 15px 0;"></div>
       <button type="button" class="btn btn-success" style="width: 100%; font-size: 1rem; padding: 10px;" onclick="closePriestResultModal()">Fermer 🔒</button>
+    </div>
+  </div>
+
+  <!-- MODALE CHOIX DU BARON (RANG 3) -->
+  <div id="modal-baron-select" class="modal-overlay">
+    <div class="modal-content">
+      <h3 style="color: var(--accent); margin-bottom: 10px;">⚔️ Duel du Baron (Rang 3)</h3>
+      <div class="form-group">
+        <label>Choisir un adversaire à défier :</label>
+        <select id="baron-target-player"></select>
+      </div>
+      <button type="button" class="btn btn-success" style="margin-top: 15px; width: 100%;" onclick="confirmBaronSelection()">Proposer le Duel 🤺</button>
+    </div>
+  </div>
+
+  <!-- MODALE DUEL BARON (DUELLISTES & SPECTATEURS) -->
+  <div id="modal-baron-duel" class="modal-overlay">
+    <div class="modal-content" style="max-width: 420px; border-color: var(--accent);">
+      <h3 id="baron-duel-title" style="color: var(--accent); margin-bottom: 10px;">⚔️ Duel en cours</h3>
+      <p id="baron-duel-subtitle" style="font-size: 0.85rem; color: #cbd5e1; margin-bottom: 10px;"></p>
+      
+      <div id="baron-duel-cards-container" class="duel-arena"></div>
+
+      <div id="baron-outcome-msg" style="margin-top: 12px; font-weight: bold; font-size: 1.05rem;"></div>
+
+      <div style="margin-top: 15px;">
+        <button type="button" id="btn-baron-action" class="btn btn-success" style="width: 100%; font-size: 1rem; padding: 10px;" onclick="handleBaronDuelClick()">Retourner ma carte 🃏</button>
+      </div>
     </div>
   </div>
 
@@ -150,7 +176,6 @@
     </div>
   </div>
 
-  <!-- JavaScript Externe -->
   <script src="script.js"></script>
 </body>
 </html>
