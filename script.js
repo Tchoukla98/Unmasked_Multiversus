@@ -18,6 +18,7 @@ let currentGameMode = 'multi';
 const playerId = "p_" + Math.floor(Math.random() * 10000);
 let myPlayerName = "Joueur";
 let localState = null;
+let currentBaronDuelData = null; // Stockage temporaire du duel
 
 document.addEventListener("DOMContentLoaded", function() {
   renderConfig();
@@ -197,7 +198,8 @@ function startGameLogic() {
       currentTurnIndex: 0,
       playerOrder: playerIds,
       lastPlayed: null,
-      lastLog: "Nouvelle partie démarrée !"
+      lastLog: "Nouvelle partie démarrée !",
+      baronEvent: null
     };
 
     db.ref(`rooms/${currentRoom}/gameState`).set(gameState);
@@ -220,7 +222,8 @@ function startBotGame() {
     currentTurnIndex: 0,
     playerOrder: [playerId, "bot"],
     lastPlayed: null,
-    lastLog: "Partie contre le Robot commencée !"
+    lastLog: "Partie contre le Robot commencée !",
+    baronEvent: null
   };
 
   localState.hands[playerId].push(localState.deck.pop());
@@ -309,14 +312,20 @@ function updateGameBoard(state) {
 
     handContainer.appendChild(cardDiv);
   });
+
+  // VÉRIFICATION D'UN DUEL BARON EN COURS
+  if(state.baronEvent && !currentBaronDuelData) {
+    checkAndDisplayBaronModal(state.baronEvent);
+  }
 }
 
-// GESTION DES CLICS SUR LES CARTES
 function onCardClicked(cardRank, state) {
   if(cardRank === 1) { 
     openGuardModal(state);
   } else if(cardRank === 2) {
     openPriestModal(state);
+  } else if(cardRank === 3) {
+    openBaronModal(state);
   } else {
     executePlayCard(cardRank, state);
   }
@@ -436,14 +445,11 @@ function confirmPriestAction() {
 function processPriestLogic(state, targetId) {
   const targetHand = state.hands[targetId] || [];
   const targetName = state.playerNames[targetId] || "L'adversaire";
-  const targetCardRank = targetHand[0]; // Carte en main du joueur ciblé
+  const targetCardRank = targetHand[0];
 
   const roleObj = rolesData.find(r => r.rank === targetCardRank) || { rank: targetCardRank, name: "Carte " + targetCardRank, power: "" };
 
-  // 1. Afficher la carte ESPIONNÉE en secret uniquement pour le joueur ayant joué le Rang 2
   showPriestResultModal(targetName, roleObj);
-
-  // 2. Diffuser un log public pour les autres joueurs
   const publicLog = `${myPlayerName} a regardé la main de ${targetName}`;
   executePlayCard(2, state, publicLog);
 }
@@ -469,6 +475,227 @@ function showPriestResultModal(targetName, roleObj) {
 
 function closePriestResultModal() {
   document.getElementById('modal-priest-result').style.display = 'none';
+}
+
+// --- RANG 3 : BARON (DUEL DE CARTES) ---
+function openBaronModal(state) {
+  const targetSelect = document.getElementById('baron-target-player');
+  targetSelect.innerHTML = '';
+
+  state.playerOrder.forEach(id => {
+    if(id !== playerId && (!state.eliminated || !state.eliminated[id])) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.innerText = state.playerNames ? state.playerNames[id] : id;
+      targetSelect.appendChild(opt);
+    }
+  });
+
+  if(targetSelect.options.length === 0) {
+    executePlayCard(3, state, "Le Baron est joué mais personne ne peut être ciblé !");
+    return;
+  }
+
+  document.getElementById('modal-baron-select').style.display = 'flex';
+}
+
+function confirmBaronSelection() {
+  document.getElementById('modal-baron-select').style.display = 'none';
+  const targetId = document.getElementById('baron-target-player').value;
+
+  const state = (currentGameMode === 'multi') ? null : localState;
+  if(currentGameMode === 'multi') {
+    db.ref(`rooms/${currentRoom}/gameState`).once('value').then(snap => {
+      initiateBaronDuel(snap.val(), targetId);
+    });
+  } else {
+    initiateBaronDuel(state, targetId);
+  }
+}
+
+function initiateBaronDuel(state, targetId) {
+  const challengerName = myPlayerName;
+  const targetName = state.playerNames[targetId] || "Robot";
+
+  const challengerCard = (state.hands[playerId].filter(c => c !== 3)[0] !== undefined) ? state.hands[playerId].filter(c => c !== 3)[0] : state.hands[playerId][0];
+  const targetCard = state.hands[targetId][0];
+
+  const baronEventData = {
+    challengerId: playerId,
+    challengerName: challengerName,
+    challengerCard: challengerCard,
+    targetId: targetId,
+    targetName: targetName,
+    targetCard: targetCard,
+    revealed: false
+  };
+
+  state.baronEvent = baronEventData;
+
+  if(currentGameMode === 'bot') {
+    checkAndDisplayBaronModal(baronEventData);
+  } else {
+    db.ref(`rooms/${currentRoom}/gameState`).set(state);
+  }
+}
+
+function checkAndDisplayBaronModal(baronData) {
+  currentBaronDuelData = baronData;
+
+  const title = document.getElementById('baron-duel-title');
+  const subtitle = document.getElementById('baron-duel-subtitle');
+  const arena = document.getElementById('baron-duel-cards-container');
+  const outcome = document.getElementById('baron-outcome-msg');
+  const btn = document.getElementById('btn-baron-action');
+
+  title.innerText = "⚔️ Duel du Baron !";
+  outcome.innerText = "";
+  
+  const isChallenger = (baronData.challengerId === playerId);
+  const isTarget = (baronData.targetId === playerId);
+
+  if(isChallenger || isTarget) {
+    subtitle.innerText = `${baronData.challengerName} défie ${baronData.targetName} en duel !`;
+    
+    // Visuel de départ avec dos de carte
+    arena.innerHTML = `
+      <div style="text-align:center;">
+        <div style="font-size:0.75rem; color:#4ade80; font-weight:bold;">${baronData.challengerName}</div>
+        <div class="card-back-style">❓</div>
+      </div>
+      <div style="font-weight:bold; color:var(--accent);">VS</div>
+      <div style="text-align:center;">
+        <div style="font-size:0.75rem; color:#ef4444; font-weight:bold;">${baronData.targetName}</div>
+        <div class="card-back-style">❓</div>
+      </div>
+    `;
+
+    btn.innerText = "Retourner ma carte 🃏";
+    btn.style.display = "block";
+    btn.onclick = () => revealBaronCards();
+  } else {
+    // SPECTATEUR
+    subtitle.innerText = `${baronData.challengerName} et ${baronData.targetName} sont en duel...`;
+    arena.innerHTML = `
+      <div style="text-align:center;">
+        <div style="font-size:0.75rem; font-weight:bold;">${baronData.challengerName}</div>
+        <div class="card-back-style">🃏</div>
+      </div>
+      <div style="font-weight:bold; color:var(--accent);">VS</div>
+      <div style="text-align:center;">
+        <div style="font-size:0.75rem; font-weight:bold;">${baronData.targetName}</div>
+        <div class="card-back-style">🃏</div>
+      </div>
+    `;
+    btn.innerText = "Fermer 👍";
+    btn.style.display = "block";
+    btn.onclick = () => { document.getElementById('modal-baron-duel').style.display = 'none'; };
+  }
+
+  document.getElementById('modal-baron-duel').style.display = 'flex';
+}
+
+function revealBaronCards() {
+  const data = currentBaronDuelData;
+  if(!data) return;
+
+  const arena = document.getElementById('baron-duel-cards-container');
+  const outcome = document.getElementById('baron-outcome-msg');
+  const btn = document.getElementById('btn-baron-action');
+
+  const cRole = rolesData.find(r => r.rank === data.challengerCard) || { rank: data.challengerCard, name: "Rang " + data.challengerCard };
+  const tRole = rolesData.find(r => r.rank === data.targetCard) || { rank: data.targetCard, name: "Rang " + data.targetCard };
+
+  // Révélation des 2 cartes en vert (mon côté) / rouge (adversaire)
+  const isChallenger = (data.challengerId === playerId);
+  const cColor = isChallenger ? "#4ade80" : "#ef4444";
+  const tColor = !isChallenger ? "#4ade80" : "#ef4444";
+
+  arena.innerHTML = `
+    <div style="text-align:center;">
+      <div style="font-size:0.75rem; color:${cColor}; font-weight:bold;">${data.challengerName}</div>
+      ${getMiniCardHTML(cRole)}
+    </div>
+    <div style="font-weight:bold; color:var(--accent);">VS</div>
+    <div style="text-align:center;">
+      <div style="font-size:0.75rem; color:${tColor}; font-weight:bold;">${data.targetName}</div>
+      ${getMiniCardHTML(tRole)}
+    </div>
+  `;
+
+  // Résolution du duel (Comparaison après 1 seconde)
+  setTimeout(() => {
+    let loserId = null;
+    let logText = "";
+
+    if(data.challengerCard < data.targetCard) {
+      loserId = data.challengerId;
+      logText = `⚔️ ${data.targetName} remporte le duel ! ${data.challengerName} (Rang ${data.challengerCard}) est ÉLIMINÉ !`;
+    } else if(data.targetCard < data.challengerCard) {
+      loserId = data.targetId;
+      logText = `⚔️ ${data.challengerName} remporte le duel ! ${data.targetName} (Rang ${data.targetCard}) est ÉLIMINÉ !`;
+    } else {
+      logText = `⚔️ ÉGALITÉ ! Personne n'est éliminé du duel.`;
+    }
+
+    if(loserId === playerId) {
+      outcome.innerHTML = `<span style="color:#ef4444;">💀 VOUS AVEZ PERDU LE DUEL !</span>`;
+    } else if(loserId !== null) {
+      outcome.innerHTML = `<span style="color:#4ade80;">🏆 VOUS AVEZ GAGNÉ LE DUEL !</span>`;
+    } else {
+      outcome.innerHTML = `<span style="color:var(--accent);">🤝 ÉGALITÉ !</span>`;
+    }
+
+    btn.innerText = "Continuer le Jeu 🚀";
+    btn.onclick = () => finishBaronTurn(loserId, logText);
+  }, 1000);
+}
+
+function getMiniCardHTML(roleObj) {
+  return `
+    <div class="card-playable" style="cursor:default; width:110px; height:155px;">
+      <div class="card-badge-num">${roleObj.rank}</div>
+      <div class="card-title">${roleObj.name || roleObj.official}</div>
+      <div class="card-img-holder" style="height:60px;">
+        ${roleObj.image ? `<img src="${roleObj.image}">` : '<div style="height:100%; background:#15803d; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.6rem;">Sans Image</div>'}
+      </div>
+      <div class="card-desc-box" style="font-size:0.55rem; max-height:45px;">
+        <strong>${roleObj.name || roleObj.official}</strong>
+      </div>
+    </div>
+  `;
+}
+
+function finishBaronTurn(loserId, logText) {
+  document.getElementById('modal-baron-duel').style.display = 'none';
+  currentBaronDuelData = null;
+
+  const state = (currentGameMode === 'multi') ? null : localState;
+  
+  if(currentGameMode === 'multi') {
+    db.ref(`rooms/${currentRoom}/gameState`).once('value').then(snap => {
+      const currentState = snap.val();
+      if(loserId) {
+        if(!currentState.eliminated) currentState.eliminated = {};
+        currentState.eliminated[loserId] = true;
+        const droppedCard = currentState.hands[loserId].pop();
+        currentState.hands[loserId] = [];
+        currentState.lastPlayed = { player: currentState.playerNames[loserId], card: droppedCard };
+      }
+      currentState.baronEvent = null;
+      executePlayCard(3, currentState, logText);
+    });
+  } else {
+    if(loserId) {
+      if(!state.eliminated) state.eliminated = {};
+      state.eliminated[loserId] = true;
+      const droppedCard = state.hands[loserId].pop();
+      state.hands[loserId] = [];
+      state.lastPlayed = { player: state.playerNames[loserId], card: droppedCard };
+    }
+    state.baronEvent = null;
+    executePlayCard(3, state, logText);
+  }
 }
 
 // EXECUTION GÉNÉRALE DES TOURS
@@ -502,7 +729,8 @@ function executePlayCard(cardRank, state, customLog) {
     updateGameBoard(localState);
 
     if(nextPlayerId === 'bot' && (!localState.eliminated || !localState.eliminated['bot'])) {
-      setTimeout(playBotTurn, 1400);
+      // DÉLAI DE 2 SECONDES POUR LAISSER LE TEMPS DE LIRE LES POPUPS
+      setTimeout(playBotTurn, 2200);
     }
   }
 }
@@ -534,6 +762,22 @@ function playBotTurn() {
       }
     } else if(playedCard === 2) {
       logMsg = `Robot a joué le Prêtre (Rang 2) et a regardé votre main.`;
+    } else if(playedCard === 3) {
+      // Robot lance un duel Baron
+      const botCardVal = botCards[0] || localState.hands['bot'][0];
+      const userCardVal = localState.hands[playerId][0];
+      
+      const baronEventData = {
+        challengerId: "bot",
+        challengerName: "Robot",
+        challengerCard: botCardVal,
+        targetId: playerId,
+        targetName: myPlayerName,
+        targetCard: userCardVal,
+        revealed: false
+      };
+      checkAndDisplayBaronModal(baronEventData);
+      return;
     }
 
     localState.lastPlayed = { player: "Robot", card: playedCard };
