@@ -45,6 +45,27 @@
     </div>
   </div>
 
+  <!-- MODALE CHOIX DU PRÊTRE (RANG 2) -->
+  <div id="modal-priest" class="modal-overlay">
+    <div class="modal-content">
+      <h3 style="color: var(--accent); margin-bottom: 10px;">👁️ Pouvoir du Prêtre (Rang 2)</h3>
+      <div class="form-group">
+        <label>Choisir le Joueur à Espionner :</label>
+        <select id="priest-target-player"></select>
+      </div>
+      <button type="button" class="btn btn-success" style="margin-top: 15px; width: 100%;" onclick="confirmPriestAction()">Regarder la carte 👁️</button>
+    </div>
+  </div>
+
+  <!-- MODALE RÉSULTAT DU PRÊTRE (RÉVÉLATION DE LA CARTE) -->
+  <div id="modal-priest-result" class="modal-overlay">
+    <div class="modal-content" style="border-color: var(--accent);">
+      <h3 id="priest-result-title" style="color: var(--accent); margin-bottom: 10px;">👁️ Main Espionnée</h3>
+      <div id="priest-result-card" style="display: flex; justify-content: center; margin: 15px 0;"></div>
+      <button type="button" class="btn btn-success" style="width: 100%; font-size: 1rem; padding: 10px;" onclick="closePriestResultModal()">Fermer 🔒</button>
+    </div>
+  </div>
+
   <!-- PAGE CONFIGURATION -->
   <div id="page-config" class="page active">
     <div class="panel">
