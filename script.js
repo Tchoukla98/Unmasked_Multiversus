@@ -20,6 +20,8 @@ let myPlayerName = "Joueur";
 let localState = null;
 let currentBaronDuelData = null;
 let currentPrinceData = null;
+let currentChancellorData = null;
+let selectedChancellorIndices = [];
 
 document.addEventListener("DOMContentLoaded", function() {
   renderConfig();
@@ -202,7 +204,8 @@ function startGameLogic() {
       lastPlayed: null,
       lastLog: "Nouvelle partie démarrée !",
       baronEvent: null,
-      princeEvent: null
+      princeEvent: null,
+      chancellorEvent: null
     };
 
     db.ref(`rooms/${currentRoom}/gameState`).set(gameState);
@@ -228,7 +231,8 @@ function startBotGame() {
     lastPlayed: null,
     lastLog: "Partie contre le Robot commencée !",
     baronEvent: null,
-    princeEvent: null
+    princeEvent: null,
+    chancellorEvent: null
   };
 
   localState.hands[playerId].push(localState.deck.pop());
@@ -309,7 +313,7 @@ function updateGameBoard(state) {
       </div>
     `;
 
-    if(isMyTurn) {
+    if(isMyTurn && !state.chancellorEvent) {
       cardDiv.onclick = () => onCardClicked(cardRank, state);
     } else {
       cardDiv.style.opacity = '0.6';
@@ -325,6 +329,17 @@ function updateGameBoard(state) {
   if(state.princeEvent && !currentPrinceData) {
     checkAndDisplayPrinceModal(state.princeEvent);
   }
+
+  // GESTION DU CHANCELIER (FERMETURE SYNCHRONISÉE)
+  if(state.chancellorEvent) {
+    if(!currentChancellorData) {
+      checkAndDisplayChancellorModal(state.chancellorEvent);
+    }
+  } else {
+    // Si chancellorEvent devient null sur Firebase, fermer la modale pour tout le monde !
+    document.getElementById('modal-chancellor').style.display = 'none';
+    currentChancellorData = null;
+  }
 }
 
 // DECLENCHEMENT DES EFFETS
@@ -337,10 +352,184 @@ function onCardClicked(cardRank, state) {
     openBaronModal(state);
   } else if(cardRank === 5) {
     openPrinceModal(state);
+  } else if(cardRank === 6) { // RANG 6 : CHANCELIER
+    initiateChancellorEffect(state);
   } else if(cardRank === 9) {
     playPrincessCard(state);
   } else {
     executePlayCard(cardRank, state);
+  }
+}
+
+// --- RANG 6 : CHANCELIER ---
+function initiateChancellorEffect(state) {
+  // Retirer le Chancelier joué de la main
+  const idx = state.hands[playerId].indexOf(6);
+  if(idx > -1) state.hands[playerId].splice(idx, 1);
+
+  // Piocher jusqu'à 2 cartes dans le paquet
+  const drawnCards = [];
+  if(state.deck && state.deck.length > 0) drawnCards.push(state.deck.pop());
+  if(state.deck && state.deck.length > 0) drawnCards.push(state.deck.pop());
+
+  const currentHandCards = [...state.hands[playerId]];
+  const totalOptions = [...currentHandCards, ...drawnCards];
+
+  const chancellorEventData = {
+    casterId: playerId,
+    casterName: myPlayerName,
+    options: totalOptions, // Les 3 (ou 2) cartes à trier
+    returnCount: drawnCards.length // Combien de cartes doivent retourner sous la pioche (généralement 2)
+  };
+
+  state.chancellorEvent = chancellorEventData;
+
+  if(currentGameMode === 'bot') {
+    checkAndDisplayChancellorModal(chancellorEventData);
+  } else {
+    db.ref(`rooms/${currentRoom}/gameState`).set(state);
+  }
+}
+
+function checkAndDisplayChancellorModal(chancellorData) {
+  currentChancellorData = chancellorData;
+  selectedChancellorIndices = [];
+
+  const title = document.getElementById('chancellor-title');
+  const subtitle = document.getElementById('chancellor-subtitle');
+  const container = document.getElementById('chancellor-cards-container');
+  const btn = document.getElementById('btn-chancellor-confirm');
+
+  container.innerHTML = '';
+
+  if(chancellorData.casterId === playerId) {
+    // JOUEUR ACTIF : CHOIX DES CARTES
+    title.innerText = "📜 Action du Chancelier";
+    subtitle.innerText = `Sélectionnez ${chancellorData.returnCount} carte(s) à remettre SOUS la pioche :`;
+    btn.style.display = "block";
+    btn.innerText = `Valider (${selectedChancellorIndices.length}/${chancellorData.returnCount})`;
+    btn.style.opacity = "0.6";
+
+    chancellorData.options.forEach((cardRank, index) => {
+      const roleObj = rolesData.find(r => r.rank === cardRank) || { rank: cardRank, name: "Rang " + cardRank, power: "" };
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'card-playable';
+      cardDiv.style.width = "115px";
+      cardDiv.style.height = "165px";
+      cardDiv.innerHTML = `
+        <div class="card-badge-num">${roleObj.rank}</div>
+        <div class="card-title">${roleObj.name || roleObj.official}</div>
+        <div class="card-img-holder" style="height:65px;">
+          ${roleObj.image ? `<img src="${roleObj.image}">` : '<div style="height:100%; background:#15803d; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.6rem;">Sans Image</div>'}
+        </div>
+        <div class="card-desc-box" style="font-size:0.55rem; max-height:45px;">
+          <strong>${roleObj.name || roleObj.official}</strong>
+        </div>
+      `;
+
+      cardDiv.onclick = () => toggleChancellorSelection(index, cardDiv, chancellorData.returnCount);
+      container.appendChild(cardDiv);
+    });
+  } else {
+    // SPECTATEURS : AFFICHAGE FACE CACHÉE
+    title.innerText = "📜 Chancelier en cours...";
+    subtitle.innerText = `${chancellorData.casterName} a joué le Chancelier et choisit ses cartes...`;
+    btn.style.display = "none";
+
+    chancellorData.options.forEach(() => {
+      const backDiv = document.createElement('div');
+      backDiv.className = 'card-back-style';
+      backDiv.style.width = "110px";
+      backDiv.style.height = "160px";
+      backDiv.innerText = "🃏";
+      container.appendChild(backDiv);
+    });
+  }
+
+  document.getElementById('modal-chancellor').style.display = 'flex';
+
+  // Si c'est le Robot qui joue le Chancelier, il fait son choix automatiquement après 1.5s
+  if(chancellorData.casterId === 'bot') {
+    setTimeout(executeBotChancellor, 1500);
+  }
+}
+
+function toggleChancellorSelection(index, element, targetCount) {
+  const existingIdx = selectedChancellorIndices.indexOf(index);
+
+  if(existingIdx > -1) {
+    selectedChancellorIndices.splice(existingIdx, 1);
+    element.classList.remove('card-selected-return');
+  } else {
+    if(selectedChancellorIndices.length < targetCount) {
+      selectedChancellorIndices.push(index);
+      element.classList.add('card-selected-return');
+    }
+  }
+
+  const btn = document.getElementById('btn-chancellor-confirm');
+  btn.innerText = `Valider (${selectedChancellorIndices.length}/${targetCount}) 📥`;
+  btn.style.opacity = (selectedChancellorIndices.length === targetCount) ? "1" : "0.6";
+}
+
+function confirmChancellorSelection() {
+  const data = currentChancellorData;
+  if(!data || selectedChancellorIndices.length !== data.returnCount) {
+    alert(`Veuillez sélectionner exactement ${data.returnCount} carte(s) à remettre sous le paquet.`);
+    return;
+  }
+
+  const returnedCards = [];
+  const keptCards = [];
+
+  data.options.forEach((cardRank, idx) => {
+    if(selectedChancellorIndices.includes(idx)) {
+      returnedCards.push(cardRank);
+    } else {
+      keptCards.push(cardRank);
+    }
+  });
+
+  finishChancellorTurn(data.casterId, keptCards, returnedCards, data.casterName);
+}
+
+function executeBotChancellor() {
+  const data = currentChancellorData;
+  if(!data) return;
+
+  // Le bot remet au hasard 2 cartes sous la pioche
+  const shuffledOptions = [...data.options].sort(() => Math.random() - 0.5);
+  const keptCards = [shuffledOptions.pop()];
+  const returnedCards = shuffledOptions;
+
+  finishChancellorTurn('bot', keptCards, returnedCards, "Robot");
+}
+
+function finishChancellorTurn(casterId, keptCards, returnedCards, casterName) {
+  const state = (currentGameMode === 'multi') ? null : localState;
+
+  function applyChancellorResult(currentState) {
+    // 1. Mettre à jour la main du joueur avec les cartes conservées
+    currentState.hands[casterId] = keptCards;
+
+    // 2. Remettre les cartes sélectionnées au fond de la pioche (au début du tableau)
+    if(!currentState.deck) currentState.deck = [];
+    returnedCards.forEach(card => {
+      currentState.deck.unshift(card);
+    });
+
+    currentState.chancellorEvent = null; // Ferme la modale chez tout le monde !
+    const logMsg = `📜 ${casterName} a joué le Chancelier (Rang 6) et a remis ${returnedCards.length} carte(s) sous la pioche.`;
+
+    executePlayCard(6, currentState, logMsg);
+  }
+
+  if(currentGameMode === 'multi') {
+    db.ref(`rooms/${currentRoom}/gameState`).once('value').then(snap => {
+      applyChancellorResult(snap.val());
+    });
+  } else {
+    applyChancellorResult(state);
   }
 }
 
@@ -391,7 +580,6 @@ function confirmPrinceSelection() {
 function initiatePrinceEffect(state, targetId) {
   const targetName = state.playerNames[targetId] || "Robot";
   
-  // Carte que le joueur Y va devoir défausser
   const targetCard = (targetId === playerId && state.hands[playerId].length > 1) 
     ? state.hands[playerId].filter(c => c !== 5)[0] 
     : state.hands[targetId][0];
@@ -437,7 +625,6 @@ function checkAndDisplayPrinceModal(princeData) {
 
   document.getElementById('modal-prince-action').style.display = 'flex';
 
-  // Si c'est le Robot qui est ciblé, il défausse automatiquement après 1s
   if(princeData.targetId === 'bot') {
     setTimeout(executePrinceDiscard, 1000);
   }
@@ -471,7 +658,6 @@ function executePrinceDiscard() {
     </div>
   `;
 
-  // ÉVALUATION DE LA RÈGLE N°9 (PRINCESSE)
   let isPrincessEliminated = (data.targetCard === 9);
 
   let countdown = 5;
@@ -503,11 +689,9 @@ function finishPrinceTurn(data, isPrincessEliminated) {
       currentState.hands[targetId] = [];
       currentState.lastPlayed = { player: data.targetName, card: 9 };
     } else {
-      // Le joueur retire l'ancienne carte et en pioche une nouvelle
       const idx = currentState.hands[targetId].indexOf(data.targetCard);
       if(idx > -1) currentState.hands[targetId].splice(idx, 1);
 
-      // Si la pioche est vide, pioche la carte écartée de début de partie
       let newCard = (currentState.deck && currentState.deck.length > 0) 
         ? currentState.deck.pop() 
         : currentState.removedCard;
@@ -901,8 +1085,11 @@ function finishBaronTurn(loserId, logText) {
 
 // EXECUTION GENERALE DES TOURS
 function executePlayCard(cardRank, state, customLog) {
-  const idx = state.hands[playerId].indexOf(cardRank);
-  if(idx > -1) state.hands[playerId].splice(idx, 1);
+  // Si le Rang est 6, on a déjà retiré la carte dans initiateChancellorEffect
+  if(cardRank !== 6) {
+    const idx = state.hands[playerId].indexOf(cardRank);
+    if(idx > -1) state.hands[playerId].splice(idx, 1);
+  }
 
   const playedRoleObj = rolesData.find(r => r.rank === cardRank) || {};
   const cardName = playedRoleObj.name || playedRoleObj.official || cardRank;
@@ -978,8 +1165,11 @@ function playBotTurn() {
       checkAndDisplayBaronModal(baronEventData);
       return;
     } else if(playedCard === 5) {
-      // Robot joue le Prince et cible le joueur
       initiatePrinceEffect(localState, playerId);
+      return;
+    } else if(playedCard === 6) {
+      // Robot joue le Chancelier
+      initiateChancellorEffect(localState);
       return;
     } else if(playedCard === 9) {
       if(!localState.eliminated) localState.eliminated = {};
