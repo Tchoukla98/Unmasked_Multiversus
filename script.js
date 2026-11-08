@@ -363,13 +363,13 @@ function onCardClicked(cardRank, state) {
   }
 }
 
-// --- GESTION DE FIN DE MANCHE ---
+// --- GESTION DE FIN DE MANCHE (AVEC DÉLAI DE 2 SECONDES) ---
 function checkEndRoundCondition(state) {
   if(!state) return false;
 
   const alivePlayers = state.playerOrder.filter(id => !state.eliminated || !state.eliminated[id]);
 
-  // CAS 1 : UN SEUL SURVIVANT (Victoire par élimination -> Ancien Pop-up court 4s)
+  // CAS 1 : UN SEUL SURVIVANT
   if(alivePlayers.length === 1) {
     const winnerId = alivePlayers[0];
     const winnerName = state.playerNames[winnerId] || "Joueur";
@@ -378,15 +378,21 @@ function checkEndRoundCondition(state) {
       reason: 'elimination',
       winnerId: winnerId,
       winnerName: winnerName,
-      handsToReveal: state.hands
+      handsToReveal: state.hands,
+      lastLog: state.lastLog || ""
     };
     
     state.endRoundEvent = endRoundData;
-    triggerEndRoundModal(endRoundData);
+
+    // DÉLAI DE 2 SECONDES AVANT D'OUVRIR LE POP-UP POUR ACCORDER DU TEMPS DE LECTURE SUR LE TAPIS
+    setTimeout(() => {
+      triggerEndRoundModal(endRoundData);
+    }, 2000);
+
     return true;
   }
 
-  // CAS 2 : PIOCHE ÉPUISÉE (Départage des 2+ survivants -> Comparatif cartes caché puis révélé)
+  // CAS 2 : PIOCHE ÉPUISÉE (Départage)
   if(!state.deck || state.deck.length === 0) {
     let highestRank = -1;
     alivePlayers.forEach(id => {
@@ -402,7 +408,11 @@ function checkEndRoundCondition(state) {
     };
 
     state.endRoundEvent = endRoundData;
-    triggerEndRoundModal(endRoundData);
+
+    setTimeout(() => {
+      triggerEndRoundModal(endRoundData);
+    }, 2000);
+
     return true;
   }
 
@@ -419,9 +429,16 @@ function triggerEndRoundModal(endData) {
   container.innerHTML = '';
   
   if(endData.reason === 'elimination') {
-    subtitle.innerHTML = `<span style="font-size:1.1rem; color:#4ade80;">🏆 <strong>${endData.winnerName}</strong> remporte la manche !</span><br><span style="font-size:0.85rem; color:#cbd5e1;">Tous les autres joueurs ont été éliminés.</span>`;
+    const isMeWinner = (endData.winnerId === playerId);
+    const resultTitle = isMeWinner ? "🏆 VICTOIRE !" : "💀 DÉFAITE !";
+    const resultColor = isMeWinner ? "#4ade80" : "#ef4444";
+
+    subtitle.innerHTML = `
+      <div style="font-size:1.3rem; color:${resultColor}; font-weight:bold; margin-bottom:6px;">${resultTitle}</div>
+      <div style="font-size:0.95rem; color:white; margin-bottom:4px;"><strong>${endData.winnerName}</strong> remporte la manche !</div>
+      <div style="font-size:0.8rem; color:#cbd5e1; font-style:italic;">${endData.lastLog}</div>
+    `;
     
-    // Pour l'élimination : pas de décompte carte cachée, affichage direct
     let countdownReset = 4;
     statusMsg.innerText = `Nouvelle manche dans ${countdownReset}s...`;
 
@@ -446,7 +463,7 @@ function triggerEndRoundModal(endData) {
     return;
   }
 
-  // DECK ÉPUISÉ : 3 SECONDES FACE CACHÉE PUIS RÉVÉLATION
+  // FIN DE MANCHE PAR DECK ÉPUISÉ
   subtitle.innerText = "📜 La pioche est épuisée ! La carte la plus forte gagne cette manche.";
   const aliveList = endData.alivePlayers || Object.keys(endData.handsToReveal);
 
@@ -1288,7 +1305,7 @@ function processGuardLogic(state, targetId, guessedRank) {
   }
 
   showGuardResultModal(title, message);
-  executePlayCard(1, state, `${myPlayerName} a joué le Garde (Rang 1) sur ${targetName}`);
+  executePlayCard(1, state, `${myPlayerName} a deviné ${guessedRoleName} (Rang ${guessedRank}) sur ${targetName}`);
 }
 
 function showGuardResultModal(title, htmlMessage) {
@@ -1383,7 +1400,7 @@ function executePlayCard(cardRank, state, customLog) {
   state.lastPlayed = { player: myPlayerName, card: cardRank };
   state.lastLog = customLog || `${myPlayerName} a joué ${cardName} (Rang ${cardRank})`;
 
-  // VÉRIFICATION FIN DE MANCHE
+  // VÉRIFICATION DE LA FIN DE MANCHE
   if(checkEndRoundCondition(state)) {
     if(currentGameMode === 'multi') db.ref(`rooms/${currentRoom}/gameState`).set(state);
     return;
