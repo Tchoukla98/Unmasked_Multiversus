@@ -363,6 +363,176 @@ function onCardClicked(cardRank, state) {
   }
 }
 
+// --- GESTION DE FIN DE MANCHE ---
+function checkEndRoundCondition(state) {
+  if(!state) return false;
+
+  const alivePlayers = state.playerOrder.filter(id => !state.eliminated || !state.eliminated[id]);
+
+  // CAS 1 : UN SEUL SURVIVANT (Victoire par élimination -> Ancien Pop-up court 4s)
+  if(alivePlayers.length === 1) {
+    const winnerId = alivePlayers[0];
+    const winnerName = state.playerNames[winnerId] || "Joueur";
+    
+    const endRoundData = {
+      reason: 'elimination',
+      winnerId: winnerId,
+      winnerName: winnerName,
+      handsToReveal: state.hands
+    };
+    
+    state.endRoundEvent = endRoundData;
+    triggerEndRoundModal(endRoundData);
+    return true;
+  }
+
+  // CAS 2 : PIOCHE ÉPUISÉE (Départage des 2+ survivants -> Comparatif cartes caché puis révélé)
+  if(!state.deck || state.deck.length === 0) {
+    let highestRank = -1;
+    alivePlayers.forEach(id => {
+      const cardVal = state.hands[id] ? state.hands[id][0] : -1;
+      if(cardVal > highestRank) highestRank = cardVal;
+    });
+
+    const endRoundData = {
+      reason: 'deck_empty',
+      highestRank: highestRank,
+      alivePlayers: alivePlayers,
+      handsToReveal: state.hands
+    };
+
+    state.endRoundEvent = endRoundData;
+    triggerEndRoundModal(endRoundData);
+    return true;
+  }
+
+  return false;
+}
+
+function triggerEndRoundModal(endData) {
+  currentEndRoundData = endData;
+
+  const container = document.getElementById('end-round-cards-container');
+  const statusMsg = document.getElementById('end-round-status-msg');
+  const subtitle = document.getElementById('end-round-subtitle');
+
+  container.innerHTML = '';
+  
+  if(endData.reason === 'elimination') {
+    subtitle.innerHTML = `<span style="font-size:1.1rem; color:#4ade80;">🏆 <strong>${endData.winnerName}</strong> remporte la manche !</span><br><span style="font-size:0.85rem; color:#cbd5e1;">Tous les autres joueurs ont été éliminés.</span>`;
+    
+    // Pour l'élimination : pas de décompte carte cachée, affichage direct
+    let countdownReset = 4;
+    statusMsg.innerText = `Nouvelle manche dans ${countdownReset}s...`;
+
+    document.getElementById('modal-end-round').style.display = 'flex';
+
+    const resetTimer = setInterval(() => {
+      countdownReset--;
+      if(countdownReset > 0) {
+        statusMsg.innerText = `Nouvelle manche dans ${countdownReset}s...`;
+      } else {
+        clearInterval(resetTimer);
+        document.getElementById('modal-end-round').style.display = 'none';
+        currentEndRoundData = null;
+
+        if(currentGameMode === 'bot') {
+          startBotGame();
+        } else {
+          startGameLogic();
+        }
+      }
+    }, 1000);
+    return;
+  }
+
+  // DECK ÉPUISÉ : 3 SECONDES FACE CACHÉE PUIS RÉVÉLATION
+  subtitle.innerText = "📜 La pioche est épuisée ! La carte la plus forte gagne cette manche.";
+  const aliveList = endData.alivePlayers || Object.keys(endData.handsToReveal);
+
+  aliveList.forEach(pId => {
+    const pName = (localState && localState.playerNames) ? localState.playerNames[pId] : pId;
+    const cardSlot = document.createElement('div');
+    cardSlot.style.textAlign = 'center';
+    cardSlot.innerHTML = `
+      <div style="font-size:0.75rem; color:var(--accent); font-weight:bold; margin-bottom:4px;">${pName}</div>
+      <div class="card-back-style">❓</div>
+    `;
+    container.appendChild(cardSlot);
+  });
+
+  document.getElementById('modal-end-round').style.display = 'flex';
+
+  let countdownReveal = 3;
+  statusMsg.innerText = `Révélation des cartes dans ${countdownReveal}s...`;
+
+  const revealTimer = setInterval(() => {
+    countdownReveal--;
+    if(countdownReveal > 0) {
+      statusMsg.innerText = `Révélation des cartes dans ${countdownReveal}s...`;
+    } else {
+      clearInterval(revealTimer);
+      revealEndRoundCards(endData);
+    }
+  }, 1000);
+}
+
+function revealEndRoundCards(endData) {
+  const container = document.getElementById('end-round-cards-container');
+  const statusMsg = document.getElementById('end-round-status-msg');
+
+  container.innerHTML = '';
+
+  const aliveList = endData.alivePlayers || Object.keys(endData.handsToReveal);
+  const highestValue = endData.highestRank;
+
+  aliveList.forEach(pId => {
+    const pName = (localState && localState.playerNames) ? localState.playerNames[pId] : pId;
+    const pCardVal = endData.handsToReveal[pId] ? endData.handsToReveal[pId][0] : 0;
+    const roleObj = rolesData.find(r => r.rank === pCardVal) || { rank: pCardVal, name: "Rang " + pCardVal };
+
+    const isWinner = (pCardVal === highestValue);
+
+    const wrapper = document.createElement('div');
+    wrapper.style.textAlign = 'center';
+
+    wrapper.innerHTML = `
+      <div style="font-size:0.75rem; color:${isWinner ? '#4ade80' : '#ef4444'}; font-weight:bold; margin-bottom:4px;">${pName}</div>
+      <div class="card-playable ${isWinner ? 'winner-highlight' : 'loser-highlight'}" style="cursor:default; width:115px; height:160px;">
+        <div class="card-badge-num">${roleObj.rank}</div>
+        <div class="card-title">${roleObj.name || roleObj.official}</div>
+        <div class="card-img-holder" style="height:65px;">
+          ${roleObj.image ? `<img src="${roleObj.image}">` : '<div style="height:100%; background:#15803d; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.6rem;">Sans Image</div>'}
+        </div>
+        <div class="card-desc-box" style="font-size:0.55rem; max-height:45px;">
+          <strong>${roleObj.name || roleObj.official}</strong>
+        </div>
+      </div>
+    `;
+    container.appendChild(wrapper);
+  });
+
+  let countdownReset = 4;
+  statusMsg.innerText = `Nouvelle manche dans ${countdownReset}s...`;
+
+  const resetTimer = setInterval(() => {
+    countdownReset--;
+    if(countdownReset > 0) {
+      statusMsg.innerText = `Nouvelle manche dans ${countdownReset}s...`;
+    } else {
+      clearInterval(resetTimer);
+      document.getElementById('modal-end-round').style.display = 'none';
+      currentEndRoundData = null;
+
+      if(currentGameMode === 'bot') {
+        startBotGame();
+      } else {
+        startGameLogic();
+      }
+    }
+  }, 1000);
+}
+
 // --- RANG 3 : BARON ---
 function openBaronModal(state) {
   const targetSelect = document.getElementById('baron-target-player');
@@ -1202,159 +1372,6 @@ function closePriestResultModal() {
   document.getElementById('modal-priest-result').style.display = 'none';
 }
 
-// --- GESTION DE FIN DE MANCHE (PIOSCHE ÉPUISÉE OU 1 SEUL JOUEUR EN VIE) ---
-function checkEndRoundCondition(state) {
-  if(!state) return false;
-
-  const alivePlayers = state.playerOrder.filter(id => !state.eliminated || !state.eliminated[id]);
-
-  // Cas 1 : Un seul survivant
-  if(alivePlayers.length === 1) {
-    const winnerId = alivePlayers[0];
-    const winnerName = state.playerNames[winnerId] || "Joueur";
-    
-    const endRoundData = {
-      reason: 'elimination',
-      winnerId: winnerId,
-      winnerName: winnerName,
-      handsToReveal: state.hands
-    };
-    
-    state.endRoundEvent = endRoundData;
-    triggerEndRoundModal(endRoundData);
-    return true;
-  }
-
-  // Cas 2 : Pioche vide
-  if(!state.deck || state.deck.length === 0) {
-    let highestRank = -1;
-    alivePlayers.forEach(id => {
-      const cardVal = state.hands[id] ? state.hands[id][0] : -1;
-      if(cardVal > highestRank) highestRank = cardVal;
-    });
-
-    const endRoundData = {
-      reason: 'deck_empty',
-      highestRank: highestRank,
-      alivePlayers: alivePlayers,
-      handsToReveal: state.hands
-    };
-
-    state.endRoundEvent = endRoundData;
-    triggerEndRoundModal(endRoundData);
-    return true;
-  }
-
-  return false;
-}
-
-function triggerEndRoundModal(endData) {
-  currentEndRoundData = endData;
-
-  const container = document.getElementById('end-round-cards-container');
-  const statusMsg = document.getElementById('end-round-status-msg');
-  const subtitle = document.getElementById('end-round-subtitle');
-
-  container.innerHTML = '';
-  
-  if(endData.reason === 'elimination') {
-    subtitle.innerText = `🏆 Victoire de ${endData.winnerName} ! Tous les autres joueurs ont été éliminés.`;
-  } else {
-    subtitle.innerText = "📜 Fin de la manche : La pioche est épuisée ! La carte la plus forte gagne cette manche.";
-  }
-
-  const aliveList = endData.alivePlayers || Object.keys(endData.handsToReveal);
-
-  // Étape 1 : Cartes face cachée pour tous les joueurs
-  aliveList.forEach(pId => {
-    const pName = (localState && localState.playerNames) ? localState.playerNames[pId] : pId;
-    const cardSlot = document.createElement('div');
-    cardSlot.id = `end-card-slot-${pId}`;
-    cardSlot.style.textAlign = 'center';
-    cardSlot.innerHTML = `
-      <div style="font-size:0.75rem; color:var(--accent); font-weight:bold; margin-bottom:4px;">${pName}</div>
-      <div class="card-back-style">❓</div>
-    `;
-    container.appendChild(cardSlot);
-  });
-
-  document.getElementById('modal-end-round').style.display = 'flex';
-
-  let countdownReveal = 3;
-  statusMsg.innerText = `Révélation des cartes dans ${countdownReveal}s...`;
-
-  const revealTimer = setInterval(() => {
-    countdownReveal--;
-    if(countdownReveal > 0) {
-      statusMsg.innerText = `Révélation des cartes dans ${countdownReveal}s...`;
-    } else {
-      clearInterval(revealTimer);
-      revealEndRoundCards(endData);
-    }
-  }, 1000);
-}
-
-function revealEndRoundCards(endData) {
-  const container = document.getElementById('end-round-cards-container');
-  const statusMsg = document.getElementById('end-round-status-msg');
-
-  container.innerHTML = '';
-
-  const aliveList = endData.alivePlayers || Object.keys(endData.handsToReveal);
-  let highestValue = endData.highestRank;
-
-  if(endData.reason === 'elimination') {
-    highestValue = endData.handsToReveal[endData.winnerId] ? endData.handsToReveal[endData.winnerId][0] : 0;
-  }
-
-  aliveList.forEach(pId => {
-    const pName = (localState && localState.playerNames) ? localState.playerNames[pId] : pId;
-    const pCardVal = endData.handsToReveal[pId] ? endData.handsToReveal[pId][0] : 0;
-    const roleObj = rolesData.find(r => r.rank === pCardVal) || { rank: pCardVal, name: "Rang " + pCardVal };
-
-    const isWinner = (pCardVal === highestValue);
-
-    const wrapper = document.createElement('div');
-    wrapper.style.textAlign = 'center';
-
-    wrapper.innerHTML = `
-      <div style="font-size:0.75rem; color:${isWinner ? '#4ade80' : '#ef4444'}; font-weight:bold; margin-bottom:4px;">${pName}</div>
-      <div class="card-playable ${isWinner ? 'winner-highlight' : 'loser-highlight'}" style="cursor:default; width:115px; height:160px;">
-        <div class="card-badge-num">${roleObj.rank}</div>
-        <div class="card-title">${roleObj.name || roleObj.official}</div>
-        <div class="card-img-holder" style="height:65px;">
-          ${roleObj.image ? `<img src="${roleObj.image}">` : '<div style="height:100%; background:#15803d; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.6rem;">Sans Image</div>'}
-        </div>
-        <div class="card-desc-box" style="font-size:0.55rem; max-height:45px;">
-          <strong>${roleObj.name || roleObj.official}</strong>
-        </div>
-      </div>
-    `;
-    container.appendChild(wrapper);
-  });
-
-  let countdownReset = 4;
-  statusMsg.innerText = `Nouvelle manche dans ${countdownReset}s...`;
-
-  const resetTimer = setInterval(() => {
-    countdownReset--;
-    if(countdownReset > 0) {
-      statusMsg.innerText = `Nouvelle manche dans ${countdownReset}s...`;
-    } else {
-      clearInterval(resetTimer);
-      document.getElementById('modal-end-round').style.display = 'none';
-      currentEndRoundData = null;
-
-      // Réinitialisation de la manche
-      if(currentGameMode === 'bot') {
-        startBotGame();
-      } else {
-        startGameLogic();
-      }
-    }
-  }, 1000);
-}
-
 // EXECUTION GENERALE DES TOURS
 function executePlayCard(cardRank, state, customLog) {
   const idx = state.hands[playerId].indexOf(cardRank);
@@ -1366,7 +1383,7 @@ function executePlayCard(cardRank, state, customLog) {
   state.lastPlayed = { player: myPlayerName, card: cardRank };
   state.lastLog = customLog || `${myPlayerName} a joué ${cardName} (Rang ${cardRank})`;
 
-  // Vérifier d'abord la condition de fin de manche
+  // VÉRIFICATION FIN DE MANCHE
   if(checkEndRoundCondition(state)) {
     if(currentGameMode === 'multi') db.ref(`rooms/${currentRoom}/gameState`).set(state);
     return;
