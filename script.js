@@ -173,6 +173,7 @@ function joinRoom() {
   }
 }
 
+// LANCEMENT DE PARTIE MULTIJOUEUR (21 CARTES DONT 6 GARDES)
 function startGameLogic() {
   if(!db) return;
   db.ref(`rooms/${currentRoom}/players`).once('value').then(snap => {
@@ -180,7 +181,7 @@ function startGameLogic() {
     if(!playersObj) return;
     const playerIds = Object.keys(playersObj);
 
-    let deck = [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8, 9];
+    let deck = [0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 8, 9];
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -204,7 +205,7 @@ function startGameLogic() {
       currentTurnIndex: 0,
       playerOrder: playerIds,
       lastPlayed: null,
-      lastLog: "Nouvelle partie démarrée !",
+      lastLog: "Nouvelle partie démarrée avec 21 cartes (6 Gardes) !",
       baronEvent: null,
       princeEvent: null,
       chancellorEvent: null,
@@ -216,8 +217,9 @@ function startGameLogic() {
   });
 }
 
+// LANCEMENT DE PARTIE SOLO VS BOT (21 CARTES DONT 6 GARDES)
 function startBotGame() {
-  let deck = [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8, 9];
+  let deck = [0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 8, 9];
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -363,7 +365,7 @@ function onCardClicked(cardRank, state) {
   }
 }
 
-// --- GESTION DE FIN DE MANCHE (AVEC DÉLAI DE 2 SECONDES) ---
+// GESTION FIN DE MANCHE AVEC PAUSE DE 2s POUR LE TAPIS
 function checkEndRoundCondition(state) {
   if(!state) return false;
 
@@ -384,7 +386,6 @@ function checkEndRoundCondition(state) {
     
     state.endRoundEvent = endRoundData;
 
-    // DÉLAI DE 2 SECONDES AVANT D'OUVRIR LE POP-UP POUR ACCORDER DU TEMPS DE LECTURE SUR LE TAPIS
     setTimeout(() => {
       triggerEndRoundModal(endRoundData);
     }, 2000);
@@ -392,7 +393,7 @@ function checkEndRoundCondition(state) {
     return true;
   }
 
-  // CAS 2 : PIOCHE ÉPUISÉE (Départage)
+  // CAS 2 : PIOCHE ÉPUISÉE
   if(!state.deck || state.deck.length === 0) {
     let highestRank = -1;
     alivePlayers.forEach(id => {
@@ -463,7 +464,6 @@ function triggerEndRoundModal(endData) {
     return;
   }
 
-  // FIN DE MANCHE PAR DECK ÉPUISÉ
   subtitle.innerText = "📜 La pioche est épuisée ! La carte la plus forte gagne cette manche.";
   const aliveList = endData.alivePlayers || Object.keys(endData.handsToReveal);
 
@@ -550,7 +550,7 @@ function revealEndRoundCards(endData) {
   }, 1000);
 }
 
-// --- RANG 3 : BARON ---
+// RANG 3 : BARON
 function openBaronModal(state) {
   const targetSelect = document.getElementById('baron-target-player');
   targetSelect.innerHTML = '';
@@ -745,7 +745,7 @@ function finishBaronTurn(loserId, logText) {
   }
 }
 
-// --- RANG 7 : ROI ---
+// RANG 7 : ROI
 function openKingModal(state) {
   const targetSelect = document.getElementById('king-target-player');
   targetSelect.innerHTML = '';
@@ -894,7 +894,7 @@ function finishKingTurn(kingData) {
   }
 }
 
-// --- RANG 6 : CHANCELIER ---
+// RANG 6 : CHANCELIER
 function initiateChancellorEffect(state, activePlayerId) {
   const activeName = state.playerNames[activePlayerId] || "Robot";
   
@@ -1056,7 +1056,7 @@ function executeChancellorSubmit(returnIndices, chancellorData) {
   }
 }
 
-// --- RANG 9 : PRINCESSE ---
+// RANG 9 : PRINCESSE
 function playPrincessCard(state) {
   if(!state.eliminated) state.eliminated = {};
   state.eliminated[playerId] = true;
@@ -1069,7 +1069,7 @@ function playPrincessCard(state) {
   executePlayCard(9, state, logMsg);
 }
 
-// --- RANG 5 : PRINCE ---
+// RANG 5 : PRINCE
 function openPrinceModal(state) {
   const targetSelect = document.getElementById('prince-target-player');
   targetSelect.innerHTML = '';
@@ -1243,7 +1243,7 @@ function finishPrinceTurn(data, isPrincessEliminated) {
   }
 }
 
-// --- RANG 1 : GARDE ---
+// RANG 1 : GARDE
 function openGuardModal(state) {
   const targetSelect = document.getElementById('guard-target-player');
   targetSelect.innerHTML = '';
@@ -1318,7 +1318,7 @@ function closeGuardResultModal() {
   document.getElementById('modal-guard-result').style.display = 'none';
 }
 
-// --- RANG 2 : PRÊTRE ---
+// RANG 2 : PRÊTRE
 function openPriestModal(state) {
   const targetSelect = document.getElementById('priest-target-player');
   targetSelect.innerHTML = '';
@@ -1400,7 +1400,6 @@ function executePlayCard(cardRank, state, customLog) {
   state.lastPlayed = { player: myPlayerName, card: cardRank };
   state.lastLog = customLog || `${myPlayerName} a joué ${cardName} (Rang ${cardRank})`;
 
-  // VÉRIFICATION DE LA FIN DE MANCHE
   if(checkEndRoundCondition(state)) {
     if(currentGameMode === 'multi') db.ref(`rooms/${currentRoom}/gameState`).set(state);
     return;
