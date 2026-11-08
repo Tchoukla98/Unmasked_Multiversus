@@ -311,14 +311,18 @@ function updateGameBoard(state) {
   });
 }
 
+// GESTION DES CLICS SUR LES CARTES
 function onCardClicked(cardRank, state) {
   if(cardRank === 1) { 
     openGuardModal(state);
+  } else if(cardRank === 2) {
+    openPriestModal(state);
   } else {
     executePlayCard(cardRank, state);
   }
 }
 
+// --- RANG 1 : GARDE ---
 function openGuardModal(state) {
   const targetSelect = document.getElementById('guard-target-player');
   targetSelect.innerHTML = '';
@@ -393,6 +397,81 @@ function closeGuardResultModal() {
   document.getElementById('modal-guard-result').style.display = 'none';
 }
 
+// --- RANG 2 : PRÊTRE ---
+function openPriestModal(state) {
+  const targetSelect = document.getElementById('priest-target-player');
+  targetSelect.innerHTML = '';
+
+  state.playerOrder.forEach(id => {
+    if(id !== playerId && (!state.eliminated || !state.eliminated[id])) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.innerText = state.playerNames ? state.playerNames[id] : id;
+      targetSelect.appendChild(opt);
+    }
+  });
+
+  if(targetSelect.options.length === 0) {
+    executePlayCard(2, state, "Rang 2 joué mais personne ne peut être ciblé !");
+    return;
+  }
+
+  document.getElementById('modal-priest').style.display = 'flex';
+}
+
+function confirmPriestAction() {
+  document.getElementById('modal-priest').style.display = 'none';
+  const targetId = document.getElementById('priest-target-player').value;
+
+  const state = (currentGameMode === 'multi') ? null : localState;
+  if(currentGameMode === 'multi') {
+    db.ref(`rooms/${currentRoom}/gameState`).once('value').then(snap => {
+      processPriestLogic(snap.val(), targetId);
+    });
+  } else {
+    processPriestLogic(state, targetId);
+  }
+}
+
+function processPriestLogic(state, targetId) {
+  const targetHand = state.hands[targetId] || [];
+  const targetName = state.playerNames[targetId] || "L'adversaire";
+  const targetCardRank = targetHand[0]; // Carte en main du joueur ciblé
+
+  const roleObj = rolesData.find(r => r.rank === targetCardRank) || { rank: targetCardRank, name: "Carte " + targetCardRank, power: "" };
+
+  // 1. Afficher la carte ESPIONNÉE en secret uniquement pour le joueur ayant joué le Rang 2
+  showPriestResultModal(targetName, roleObj);
+
+  // 2. Diffuser un log public pour les autres joueurs
+  const publicLog = `${myPlayerName} a regardé la main de ${targetName}`;
+  executePlayCard(2, state, publicLog);
+}
+
+function showPriestResultModal(targetName, roleObj) {
+  document.getElementById('priest-result-title').innerText = `👁️ Carte de ${targetName}`;
+  
+  const container = document.getElementById('priest-result-card');
+  container.innerHTML = `
+    <div class="card-playable" style="cursor:default;">
+      <div class="card-badge-num">${roleObj.rank}</div>
+      <div class="card-title">${roleObj.name || roleObj.official}</div>
+      <div class="card-img-holder">
+        ${roleObj.image ? `<img src="${roleObj.image}">` : '<div style="height:100%; background:#15803d; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.6rem;">Sans Image</div>'}
+      </div>
+      <div class="card-desc-box">
+        <strong>${roleObj.name || roleObj.official}</strong><br>${roleObj.power}
+      </div>
+    </div>
+  `;
+  document.getElementById('modal-priest-result').style.display = 'flex';
+}
+
+function closePriestResultModal() {
+  document.getElementById('modal-priest-result').style.display = 'none';
+}
+
+// EXECUTION GÉNÉRALE DES TOURS
 function executePlayCard(cardRank, state, customLog) {
   const idx = state.hands[playerId].indexOf(cardRank);
   if(idx > -1) state.hands[playerId].splice(idx, 1);
@@ -453,6 +532,8 @@ function playBotTurn() {
       } else {
         showGuardResultModal("🛡️ ATTAQUE ÉVITÉE !", `Le Robot a deviné <strong>${guessedName} (Rang ${actualGuess})</strong> sur vous... Mais vous ne l'avez pas !`);
       }
+    } else if(playedCard === 2) {
+      logMsg = `Robot a joué le Prêtre (Rang 2) et a regardé votre main.`;
     }
 
     localState.lastPlayed = { player: "Robot", card: playedCard };
